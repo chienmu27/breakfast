@@ -60,9 +60,8 @@
   // ====== 狀態 ======
   let LOGGED_IN = false;
   let SESSION_TOKEN = "";   // 用密碼當 token（後端也要用同一個方式驗證）
-  let AUTO_TIMER = null;
 
-  // ====== 工具 ======
+  // ====== 工具函數 ======
   function money(n){ return "$" + Number(n||0); }
 
   function fmtTime(v){
@@ -72,68 +71,40 @@
       if(isNaN(d.getTime())) return "";
       const pad = x => String(x).padStart(2,"0");
       return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-    }catch(e){
-      return "";
-    }
+    }catch(e){ return ""; }
   }
 
-  // ====== API ======
+  // ====== API 呼叫 ======
   async function api(payload){
-    // 所有後台操作都自動加 token（登入後）
-    if(LOGGED_IN && SESSION_TOKEN){
-      payload.token = SESSION_TOKEN;
-    }
-
+    if(LOGGED_IN && SESSION_TOKEN) payload.token = SESSION_TOKEN;
     const res = await fetch(GAS_API_URL, {
       method: "POST",
       mode: "cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
     });
-
-    // 防止 GAS 回傳 HTML 導致 json() 爆掉
     const text = await res.text();
-    try{
-      return JSON.parse(text);
-    }catch(e){
-      // 顯示前 200 字方便你判斷（通常是 Google 登入頁）
-      throw new Error("後端回傳非JSON，可能是權限/部署問題：\n" + text.slice(0, 200));
-    }
+    try{ return JSON.parse(text); }
+    catch(e){ throw new Error("後端回傳非JSON，可能權限/部署錯誤\n" + text.slice(0,200)); }
   }
 
-  // ====== 登入/登出 ======
+  // ====== 登入 / 登出 ======
   async function login(){
     const pwd = document.getElementById("pwd").value.trim();
     document.getElementById("login-msg").innerText = "驗證中...";
-
-    if(!pwd){
-      document.getElementById("login-msg").innerText = "請輸入密碼";
-      return;
-    }
+    if(!pwd){ document.getElementById("login-msg").innerText="請輸入密碼"; return; }
 
     try{
       const data = await api({ action:"adminLogin", password: pwd });
-
       if(data && data.ok){
         LOGGED_IN = true;
-        SESSION_TOKEN = pwd; // 用密碼當 token
-
+        SESSION_TOKEN = pwd;
         document.getElementById("login-view").classList.add("hidden");
         document.getElementById("admin-view").classList.remove("hidden");
-
         document.getElementById("login-msg").innerText = "";
-
-        // 先載入一次
-        await loadData();
-
-        // 避免重複 setInterval
-        if(AUTO_TIMER) clearInterval(AUTO_TIMER);
-        AUTO_TIMER = setInterval(() => {
-          if(LOGGED_IN) loadData();
-        }, 8000);
-
+        // 注意：這裡不自動刷新，等待使用者按重新整理
       }else{
-        document.getElementById("login-msg").innerText = (data && data.message) ? data.message : "密碼錯誤";
+        document.getElementById("login-msg").innerText = (data && data.message)?data.message:"密碼錯誤";
       }
     }catch(err){
       document.getElementById("login-msg").innerText = "登入失敗：" + err.message;
@@ -143,31 +114,22 @@
   function logout(){
     LOGGED_IN = false;
     SESSION_TOKEN = "";
-
-    if(AUTO_TIMER) clearInterval(AUTO_TIMER);
-    AUTO_TIMER = null;
-
     document.getElementById("pwd").value = "";
     document.getElementById("login-msg").innerText = "";
-
     document.getElementById("admin-view").classList.add("hidden");
     document.getElementById("login-view").classList.remove("hidden");
   }
 
-  // ====== 載入資料 ======
+  // ====== 載入資料（手動刷新） ======
   async function loadData(){
     if(!LOGGED_IN) return;
-
     document.getElementById("status").innerText = "載入中...";
     document.getElementById("tables").innerHTML = "";
 
     try{
-      // ★ 這裡必須帶 token（api() 已自動加）
       const data = await api({ action:"getPendingOrdersMerged" });
-
       if(!data || !data.ok){
-        document.getElementById("status").innerText =
-          (data && data.message) ? ("載入失敗：" + data.message) : "載入失敗";
+        document.getElementById("status").innerText = (data && data.message)?("載入失敗："+data.message):"載入失敗";
         return;
       }
 
@@ -185,13 +147,13 @@
     }
   }
 
-  // ====== 畫面 ======
+  // ====== 畫面渲染 ======
   function renderTables(data){
     const root = document.getElementById("tables");
     root.innerHTML = "";
 
-    data.forEach(t => {
-      const itemsHtml = (t.items || []).map(x => `
+    data.forEach(t=>{
+      const itemsHtml = (t.items||[]).map(x=>`
         <div class="flex justify-between border-b py-2">
           <div class="pr-2">
             <div class="font-bold">${x.item}</div>
@@ -202,15 +164,13 @@
       `).join("");
 
       const el = document.createElement("div");
-      el.className = "bg-white rounded-2xl shadow-sm border p-4";
+      el.className="bg-white rounded-2xl shadow-sm border p-4";
 
       el.innerHTML = `
         <div class="flex items-center justify-between mb-2">
           <div class="text-xl font-black">桌號 ${t.table}</div>
           <button class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-xl"
-            onclick="markServed('${t.table}')">
-            已送餐
-          </button>
+            onclick="markServed('${t.table}')">已送餐</button>
         </div>
 
         <div class="text-sm text-gray-500 mb-3">
@@ -225,36 +185,27 @@
           <div class="font-black text-xl text-red-600">${money(t.total)}</div>
         </div>
       `;
-
       root.appendChild(el);
     });
   }
 
-  // ====== 已送餐 ======
+  // ====== 標記已送餐 ======
   async function markServed(table){
     if(!confirm(`確定桌號 ${table} 已送餐？`)) return;
-
     try{
-      // ★ 這裡也必須帶 token（api() 已自動加）
       const data = await api({ action:"markTableServed", table });
-
       if(!data || !data.ok){
         alert(data && data.message ? data.message : "操作失敗");
         return;
       }
-
+      // 送餐完成後自動刷新畫面
       loadData();
-
-    }catch(err){
-      alert("操作失敗：" + err.message);
-    }
+    }catch(err){ alert("操作失敗：" + err.message); }
   }
 
-  // ====== 小功能：按 Enter 直接登入 ======
-  document.addEventListener("keydown", (e) => {
-    if(e.key === "Enter" && !LOGGED_IN){
-      login();
-    }
+  // ====== Enter 直接登入 ======
+  document.addEventListener("keydown",(e)=>{
+    if(e.key==="Enter" && !LOGGED_IN) login();
   });
 </script>
 
