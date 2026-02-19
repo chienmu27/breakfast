@@ -20,17 +20,19 @@
 </div>
 
 <div id="status" class="text-gray-600 mb-4"></div>
-<div id="orders-container" class="space-y-6"></div>
+
+<!-- 桌號訂單容器，網格佈局，每行最多三桌 -->
+<div id="orders-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
 
 <script>
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec"; // 改成你的 URL
-const ADMIN_PASSWORD = "123456"; // 後台密碼
+const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec";
+const ADMIN_PASSWORD = "123456";
 let token = ADMIN_PASSWORD;
 let lastPendingCount = 0;
 
 function money(n){ return "$" + Number(n||0); }
 
-// 取得訂單
+// 取得並渲染訂單
 async function loadOrders(){
   document.getElementById("status").innerText = "載入中...";
   const res = await fetch(GAS_API_URL, {
@@ -55,7 +57,7 @@ async function loadOrders(){
 
   list.forEach(table=>{
     const itemsHTML = (table.items||[]).map(item=>`
-      <div class="flex justify-between border-b py-2">
+      <div class="flex justify-between border-b py-1">
         <div class="pr-2">
           <div class="font-bold">${item.item}</div>
           <div class="text-sm text-gray-500">${money(item.price)} x ${item.qty}</div>
@@ -124,7 +126,6 @@ async function checkoutTable(btn, table){
     if(data.ok){
       btn.innerText = "已結帳";
       btn.disabled = true;
-      // 清除桌號顯示
       btn.closest("div.bg-white").remove();
       document.getElementById("status").innerText = `未送餐桌數：${--lastPendingCount} 桌`;
     } else {
@@ -165,6 +166,5 @@ setInterval(async ()=>{
 loadOrders();
 
 </script>
-
 </body>
 </html>
