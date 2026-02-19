@@ -82,7 +82,7 @@ async function loadMenu() {
     const res = await fetch(GAS_API_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "getMenu" })
+      body: JSON.stringify({ action: "getMenu" }) // 不帶 token，無需授權
     });
     const data = await res.json();
     if(data.ok) {
@@ -93,7 +93,7 @@ async function loadMenu() {
   } catch(err) { alert("菜單讀取失敗：" + err.message); }
 }
 
-// 依分類建立按鈕
+// 建立分類按鈕
 function buildCategoryButtons() {
   const categories = Array.from(new Set(menuData.map(m => m.category))).filter(c => c);
   const container = document.getElementById("category-buttons");
@@ -132,7 +132,7 @@ function displayMenu(filter = 'all') {
   });
 }
 
-// 其他購物車功能（不變）
+// 購物車功能
 function addToCart(id) {
   const item = menuData.find(m => m.id===id);
   if(!item) return;
@@ -190,7 +190,7 @@ function filterMenu(cat){
   displayMenu(cat);
 }
 
-// 送出訂單
+// 送出訂單（無登入 / 無 token）
 async function submitOrder(){
   if(!TABLE_NO){ alert("未取得桌號，請重新掃描桌號 QR Code"); return; }
   if(cart.length===0){ alert("購物車是空的"); return; }
@@ -200,7 +200,11 @@ async function submitOrder(){
 
   try{
     const payload={action:"submitOrder", table:TABLE_NO, items:cart.map(x=>({name:x.name, price:x.price, qty:x.qty}))};
-    const res = await fetch(GAS_API_URL,{method:"POST", headers:{"Content-Type":"text/plain;charset=utf-8"}, body:JSON.stringify(payload)});
+    const res = await fetch(GAS_API_URL,{
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify(payload)
+    });
     const data = await res.json();
     if(!data || !data.ok){ alert(data?.message||"送出失敗"); btn.disabled=false; btn.innerText="送出訂單"; return; }
 
