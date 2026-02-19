@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>阿根早點｜後台送餐管理</title>
+  <title>阿胖早點｜後台送餐管理</title>
   <script src="https://cdn.tailwindcss.com"></script>
 </head>
 
@@ -57,11 +57,10 @@
 </div>
 
 <script>
-  // ====== 狀態 ======
   let LOGGED_IN = false;
-  let SESSION_TOKEN = "";   // 用密碼當 token（後端也要用同一個方式驗證）
+  let SESSION_TOKEN = "";
+  let lastPendingCount = 0;  // 記錄上一輪未送餐桌數
 
-  // ====== 工具函數 ======
   function money(n){ return "$" + Number(n||0); }
 
   function fmtTime(v){
@@ -74,7 +73,6 @@
     }catch(e){ return ""; }
   }
 
-  // ====== API 呼叫 ======
   async function api(payload){
     if(LOGGED_IN && SESSION_TOKEN) payload.token = SESSION_TOKEN;
     const res = await fetch(GAS_API_URL, {
@@ -88,7 +86,7 @@
     catch(e){ throw new Error("後端回傳非JSON，可能權限/部署錯誤\n" + text.slice(0,200)); }
   }
 
-  // ====== 登入 / 登出 ======
+  // ===== 登入 =====
   async function login(){
     const pwd = document.getElementById("pwd").value.trim();
     document.getElementById("login-msg").innerText = "驗證中...";
@@ -102,7 +100,8 @@
         document.getElementById("login-view").classList.add("hidden");
         document.getElementById("admin-view").classList.remove("hidden");
         document.getElementById("login-msg").innerText = "";
-        // 注意：這裡不自動刷新，等待使用者按重新整理
+        // 登入後不自動刷新，等使用者按「重新整理」
+        checkNewOrders(); // 可呼叫一次初始檢查
       }else{
         document.getElementById("login-msg").innerText = (data && data.message)?data.message:"密碼錯誤";
       }
@@ -120,7 +119,7 @@
     document.getElementById("login-view").classList.remove("hidden");
   }
 
-  // ====== 載入資料（手動刷新） ======
+  // ===== 載入資料（手動刷新） =====
   async function loadData(){
     if(!LOGGED_IN) return;
     document.getElementById("status").innerText = "載入中...";
@@ -134,6 +133,7 @@
       }
 
       const list = data.data || [];
+      lastPendingCount = list.length;
       if(list.length === 0){
         document.getElementById("status").innerText = "目前沒有未送餐訂單 ✅";
         return;
@@ -147,7 +147,7 @@
     }
   }
 
-  // ====== 畫面渲染 ======
+  // ===== 渲染桌號資料 =====
   function renderTables(data){
     const root = document.getElementById("tables");
     root.innerHTML = "";
@@ -189,7 +189,7 @@
     });
   }
 
-  // ====== 標記已送餐 ======
+  // ===== 標記已送餐 =====
   async function markServed(table){
     if(!confirm(`確定桌號 ${table} 已送餐？`)) return;
     try{
@@ -198,12 +198,34 @@
         alert(data && data.message ? data.message : "操作失敗");
         return;
       }
-      // 送餐完成後自動刷新畫面
+      // 標記送餐後立即刷新
       loadData();
     }catch(err){ alert("操作失敗：" + err.message); }
   }
 
-  // ====== Enter 直接登入 ======
+  // ===== 自動偵測新訂單（每5秒） =====
+  async function checkNewOrders(){
+    if(!LOGGED_IN) return;
+    try{
+      const data = await api({ action:"getPendingOrdersMerged" });
+      if(!data || !data.ok) return;
+
+      const list = data.data || [];
+      const pendingCount = list.length;
+
+      if(pendingCount !== lastPendingCount){
+        lastPendingCount = pendingCount;
+        document.getElementById("status").innerText = pendingCount === 0 ? "目前沒有未送餐訂單 ✅" : `未送餐桌數：${pendingCount} 桌`;
+        renderTables(list);
+      }
+    }catch(err){
+      console.error("檢查新訂單失敗", err);
+    }
+  }
+
+  setInterval(checkNewOrders, 5000);
+
+  // ===== Enter鍵直接登入 =====
   document.addEventListener("keydown",(e)=>{
     if(e.key==="Enter" && !LOGGED_IN) login();
   });
