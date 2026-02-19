@@ -1,185 +1,284 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>阿根早點 - 中西式精緻早餐</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
-        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f9fafb; }
-        .category-btn.active { background-color: #ef4444; color: white; }
-    </style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>阿根早點 - 中西式精緻早餐</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700&display=swap');
+    body { font-family: 'Noto Sans TC', sans-serif; background-color: #f9fafb; }
+    .category-btn.active { background-color: #ef4444; color: white; }
+  </style>
 </head>
+
 <body class="pb-20">
 
-    <header class="bg-red-600 text-white p-4 shadow-md sticky top-0 z-50">
-        <div class="container mx-auto flex justify-between items-center">
-            <h1 class="text-2xl font-bold tracking-wider">阿根早點 <span class="text-sm font-normal">A-GEN Breakfast</span></h1>
-            <div class="relative cursor-pointer" onclick="toggleCart()">
-                <i class="fas fa-shopping-cart text-2xl"></i>
-                <span id="cart-count" class="absolute -top-2 -right-2 bg-yellow-400 text-red-800 text-xs font-bold px-1.5 py-0.5 rounded-full">0</span>
-            </div>
-        </div>
-    </header>
+<header class="bg-red-600 text-white p-4 shadow-md sticky top-0 z-50">
+  <div class="container mx-auto flex justify-between items-center">
+    <h1 class="text-2xl font-bold tracking-wider">
+      阿根早點 <span class="text-sm font-normal">A-GEN Breakfast</span>
+    </h1>
 
-    <div class="bg-orange-100 p-8 text-center border-b border-orange-200">
-        <h2 class="text-3xl font-bold text-gray-800 mb-2">早安！今天要吃點什麼？</h2>
-        <p class="text-gray-600 text-lg">招牌酥脆蛋餅、法式吐司，開啟活力的一天</p>
+    <div class="flex items-center gap-3">
+      <div class="text-sm bg-white/20 px-3 py-1 rounded-full">
+        桌號：<span id="table-no" class="font-bold">-</span>
+      </div>
+
+      <div class="relative cursor-pointer" onclick="toggleCart()">
+        <i class="fas fa-shopping-cart text-2xl"></i>
+        <span id="cart-count"
+          class="absolute -top-2 -right-2 bg-yellow-400 text-red-800 text-xs font-bold px-1.5 py-0.5 rounded-full">0</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="bg-orange-100 p-8 text-center border-b border-orange-200">
+  <h2 class="text-3xl font-bold text-gray-800 mb-2">早安！今天要吃點什麼？</h2>
+  <p class="text-gray-600 text-lg">招牌酥脆蛋餅、法式吐司，開啟活力的一天</p>
+</div>
+
+<nav class="sticky top-[64px] bg-white border-b overflow-x-auto whitespace-nowrap z-40 px-4 py-3 flex gap-2 no-scrollbar">
+  <button onclick="filterMenu('all')" class="category-btn active px-4 py-1.5 rounded-full border border-gray-300 text-sm">全部</button>
+  <button onclick="filterMenu('蛋餅')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">脆皮蛋餅</button>
+  <button onclick="filterMenu('吐司')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">法式吐司</button>
+  <button onclick="filterMenu('漢堡')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">漢堡類</button>
+  <button onclick="filterMenu('乳酪餅')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">乳酪餅</button>
+  <button onclick="filterMenu('小點')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">點心/套餐</button>
+  <button onclick="filterMenu('飲品')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">冷熱飲品</button>
+</nav>
+
+<main class="container mx-auto p-4">
+  <div id="menu-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+</main>
+
+<!-- 購物車 -->
+<div id="cart-sidebar"
+  class="fixed inset-y-0 right-0 w-80 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-[60] flex flex-col">
+
+  <div class="p-4 border-b flex justify-between items-center bg-gray-50">
+    <h3 class="font-bold text-xl">您的餐點</h3>
+    <button onclick="toggleCart()" class="text-gray-500 text-2xl">&times;</button>
+  </div>
+
+  <div id="cart-items" class="flex-grow overflow-y-auto p-4 space-y-4">
+    <p class="text-center text-gray-400 mt-10">購物車是空的</p>
+  </div>
+
+  <div class="p-4 border-t bg-gray-50">
+    <div class="flex justify-between mb-4">
+      <span class="font-bold">總計金額：</span>
+      <span class="text-red-600 font-bold text-xl" id="total-price">$0</span>
     </div>
 
-    <nav class="sticky top-[64px] bg-white border-b overflow-x-auto whitespace-nowrap z-40 px-4 py-3 flex gap-2 no-scrollbar">
-        <button onclick="filterMenu('all')" class="category-btn active px-4 py-1.5 rounded-full border border-gray-300 text-sm">全部</button>
-        <button onclick="filterMenu('蛋餅')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">脆皮蛋餅</button>
-        <button onclick="filterMenu('吐司')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">法式吐司</button>
-        <button onclick="filterMenu('漢堡')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">漢堡類</button>
-        <button onclick="filterMenu('乳酪餅')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">乳酪餅</button>
-        <button onclick="filterMenu('小點')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">點心/套餐</button>
-        <button onclick="filterMenu('飲品')" class="category-btn px-4 py-1.5 rounded-full border border-gray-300 text-sm">冷熱飲品</button>
-    </nav>
+    <button id="btn-submit" onclick="submitOrder()"
+      class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700">
+      送出訂單
+    </button>
+  </div>
+</div>
 
-    <main class="container mx-auto p-4">
-        <div id="menu-container" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+<div id="overlay" onclick="toggleCart()" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50"></div>
+
+<script>
+  // ==============================
+  // GAS API URL（已寫死）
+  // ==============================
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec";
+
+  // ==============================
+  // 菜單資料
+  // ==============================
+  const menuData = [
+    { id: 1, name: "原味蛋餅", price: 35, category: "蛋餅", desc: "阿根經典酥脆皮" },
+    { id: 2, name: "超級全家福蛋餅", price: 86, category: "蛋餅", desc: "豐富配料一次滿足" },
+    { id: 3, name: "玉米蛋餅", price: 44, category: "蛋餅", desc: "小朋友最愛" },
+    { id: 4, name: "培根蛋餅", price: 51, category: "蛋餅", desc: "鹹香脆皮口感" },
+    { id: 5, name: "法式豬肉吐司", price: 63, category: "吐司", desc: "柔軟法式風味" },
+    { id: 6, name: "法式巧克力", price: 46, category: "吐司", desc: "甜而不膩" },
+    { id: 7, name: "豬排蛋堡", price: 65, category: "漢堡", desc: "厚實肉片飽足感" },
+    { id: 8, name: "牛肉蛋堡", price: 70, category: "漢堡", desc: "嚴選牛肉排" },
+    { id: 9, name: "培根蛋乳酪餅", price: 55, category: "乳酪餅", desc: "濃郁乳酪香氣" },
+    { id: 10, name: "鐵板麵豬肉蛋", price: 82, category: "小點", desc: "黑胡椒口味" },
+    { id: 11, name: "中式套餐", price: 96, category: "小點", desc: "蘿蔔糕+豬肉+蔥蛋" },
+    { id: 12, name: "泡沫紅茶", price: 30, category: "飲品", desc: "清爽解膩" },
+    { id: 13, name: "胚芽奶茶", price: 45, category: "飲品", desc: "香濃營養" }
+  ];
+
+  let cart = [];
+  let TABLE_NO = "";
+
+  // ==============================
+  // 桌號讀取
+  // ==============================
+  function initTable() {
+    const url = new URL(location.href);
+    TABLE_NO = String(url.searchParams.get("table") || "").trim();
+    document.getElementById("table-no").innerText = TABLE_NO || "-";
+  }
+
+  // ==============================
+  // 菜單顯示
+  // ==============================
+  function displayMenu(filter = 'all') {
+    const container = document.getElementById('menu-container');
+    container.innerHTML = '';
+
+    const filtered = filter === 'all' ? menuData : menuData.filter(item => item.category === filter);
+
+    filtered.forEach(item => {
+      container.innerHTML += `
+        <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
+          <div class="p-4 flex justify-between items-start">
+            <div>
+              <span class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-bold">${item.category}</span>
+              <h3 class="text-lg font-bold mt-1">${item.name}</h3>
+              <p class="text-sm text-gray-500 mt-1">${item.desc}</p>
+              <p class="text-red-600 font-bold mt-2">$${item.price}</p>
             </div>
-    </main>
-
-    <div id="cart-sidebar" class="fixed inset-y-0 right-0 w-80 bg-white shadow-2xl transform translate-x-full transition-transform duration-300 z-[60] flex flex-col">
-        <div class="p-4 border-b flex justify-between items-center bg-gray-50">
-            <h3 class="font-bold text-xl">您的餐點</h3>
-            <button onclick="toggleCart()" class="text-gray-500 text-2xl">&times;</button>
+            <button onclick="addToCart(${item.id})"
+              class="bg-red-50 text-red-600 w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 hover:text-white transition-colors">
+              <i class="fas fa-plus"></i>
+            </button>
+          </div>
         </div>
-        <div id="cart-items" class="flex-grow overflow-y-auto p-4 space-y-4">
-            <p class="text-center text-gray-400 mt-10">購物車是空的</p>
+      `;
+    });
+  }
+
+  // ==============================
+  // 購物車
+  // ==============================
+  function addToCart(id) {
+    const item = menuData.find(m => m.id === id);
+    const inCart = cart.find(c => c.id === id);
+
+    if (inCart) inCart.qty++;
+    else cart.push({ ...item, qty: 1 });
+
+    updateCartUI();
+  }
+
+  function updateCartUI() {
+    const cartItems = document.getElementById('cart-items');
+    const cartCount = document.getElementById('cart-count');
+    const totalPrice = document.getElementById('total-price');
+
+    cartItems.innerHTML = cart.length === 0
+      ? '<p class="text-center text-gray-400 mt-10">購物車是空的</p>'
+      : '';
+
+    let total = 0;
+    let count = 0;
+
+    cart.forEach(item => {
+      total += item.price * item.qty;
+      count += item.qty;
+
+      cartItems.innerHTML += `
+        <div class="flex justify-between items-center border-b pb-2">
+          <div>
+            <p class="font-bold">${item.name}</p>
+            <p class="text-sm text-gray-500">$${item.price} x ${item.qty}</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="changeQty(${item.id}, -1)" class="w-6 h-6 border rounded">-</button>
+            <span>${item.qty}</span>
+            <button onclick="changeQty(${item.id}, 1)" class="w-6 h-6 border rounded">+</button>
+          </div>
         </div>
-        <div class="p-4 border-t bg-gray-50">
-            <div class="flex justify-between mb-4">
-                <span class="font-bold">總計金額：</span>
-                <span class="text-red-600 font-bold text-xl" id="total-price">$0</span>
-            </div>
-            <button class="w-full bg-green-600 text-white py-3 rounded-lg font-bold hover:bg-green-700">送出訂單</button>
-        </div>
-    </div>
+      `;
+    });
 
-    <div id="overlay" onclick="toggleCart()" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50"></div>
+    cartCount.innerText = count;
+    totalPrice.innerText = `$${total}`;
+  }
 
-    <script>
-        const menuData = [
-            { id: 1, name: "原味蛋餅", price: 35, category: "蛋餅", desc: "阿根經典酥脆皮" },
-            { id: 2, name: "超級全家福蛋餅", price: 86, category: "蛋餅", desc: "豐富配料一次滿足" },
-            { id: 3, name: "玉米蛋餅", price: 44, category: "蛋餅", desc: "小朋友最愛" },
-            { id: 4, name: "培根蛋餅", price: 51, category: "蛋餅", desc: "鹹香脆皮口感" },
-            { id: 5, name: "法式豬肉吐司", price: 63, category: "吐司", desc: "柔軟法式風味" },
-            { id: 6, name: "法式巧克力", price: 46, category: "吐司", desc: "甜而不膩" },
-            { id: 7, name: "豬排蛋堡", price: 65, category: "漢堡", desc: "厚實肉片飽足感" },
-            { id: 8, name: "牛肉蛋堡", price: 70, category: "漢堡", desc: "嚴選牛肉排" },
-            { id: 9, name: "培根蛋乳酪餅", price: 55, category: "乳酪餅", desc: "濃郁乳酪香氣" },
-            { id: 10, name: "鐵板麵豬肉蛋", price: 82, category: "小點", desc: "黑胡椒口味" },
-            { id: 11, name: "中式套餐", price: 96, category: "小點", desc: "蘿蔔糕+豬肉+蔥蛋" },
-            { id: 12, name: "泡沫紅茶", price: 30, category: "飲品", desc: "清爽解膩" },
-            { id: 13, name: "胚芽奶茶", price: 45, category: "飲品", desc: "香濃營養" }
-        ];
+  function changeQty(id, delta) {
+    const item = cart.find(c => c.id === id);
+    item.qty += delta;
 
-        let cart = [];
+    if (item.qty <= 0) cart = cart.filter(c => c.id !== id);
+    updateCartUI();
+  }
 
-        // 初始化菜單
-        function displayMenu(filter = 'all') {
-            const container = document.getElementById('menu-container');
-            container.innerHTML = '';
-            
-            const filtered = filter === 'all' ? menuData : menuData.filter(item => item.category === filter);
-            
-            filtered.forEach(item => {
-                container.innerHTML += `
-                    <div class="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden hover:shadow-md transition-shadow">
-                        <div class="p-4 flex justify-between items-start">
-                            <div>
-                                <span class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded font-bold">${item.category}</span>
-                                <h3 class="text-lg font-bold mt-1">${item.name}</h3>
-                                <p class="text-sm text-gray-500 mt-1">${item.desc}</p>
-                                <p class="text-red-600 font-bold mt-2">$${item.price}</p>
-                            </div>
-                            <button onclick="addToCart(${item.id})" class="bg-red-50 text-red-600 w-10 h-10 rounded-full flex items-center justify-center hover:bg-red-600 hover:text-white transition-colors">
-                                <i class="fas fa-plus"></i>
-                            </button>
-                        </div>
-                    </div>
-                `;
-            });
-        }
+  function toggleCart() {
+    document.getElementById('cart-sidebar').classList.toggle('translate-x-full');
+    document.getElementById('overlay').classList.toggle('hidden');
+  }
 
-        // 購物車功能
-        function addToCart(id) {
-            const item = menuData.find(m => m.id === id);
-            const inCart = cart.find(c => c.id === id);
-            if (inCart) {
-                inCart.qty++;
-            } else {
-                cart.push({...item, qty: 1});
-            }
-            updateCartUI();
-        }
+  function filterMenu(cat) {
+    document.querySelectorAll('.category-btn').forEach(btn => {
+      btn.classList.remove('active');
+      if (btn.innerText.includes(cat) || (cat === 'all' && btn.innerText === '全部')) {
+        btn.classList.add('active');
+      }
+    });
+    displayMenu(cat);
+  }
 
-        function updateCartUI() {
-            const cartItems = document.getElementById('cart-items');
-            const cartCount = document.getElementById('cart-count');
-            const totalPrice = document.getElementById('total-price');
-            
-            cartItems.innerHTML = cart.length === 0 ? '<p class="text-center text-gray-400 mt-10">購物車是空的</p>' : '';
-            
-            let total = 0;
-            let count = 0;
+  // ==============================
+  // 送出訂單：fetch 呼叫 GAS API
+  // ==============================
+  async function submitOrder() {
+    if (!TABLE_NO) {
+      alert("未取得桌號，請重新掃描桌號 QR Code");
+      return;
+    }
+    if (cart.length === 0) {
+      alert("購物車是空的");
+      return;
+    }
 
-            cart.forEach(item => {
-                total += item.price * item.qty;
-                count += item.qty;
-                cartItems.innerHTML += `
-                    <div class="flex justify-between items-center border-b pb-2">
-                        <div>
-                            <p class="font-bold">${item.name}</p>
-                            <p class="text-sm text-gray-500">$${item.price} x ${item.qty}</p>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <button onclick="changeQty(${item.id}, -1)" class="w-6 h-6 border rounded">-</button>
-                            <span>${item.qty}</span>
-                            <button onclick="changeQty(${item.id}, 1)" class="w-6 h-6 border rounded">+</button>
-                        </div>
-                    </div>
-                `;
-            });
+    const btn = document.getElementById("btn-submit");
+    btn.disabled = true;
+    btn.innerText = "送出中...";
 
-            cartCount.innerText = count;
-            totalPrice.innerText = `$${total}`;
-        }
+    try {
+      const payload = {
+        action: "submitOrder",
+        table: TABLE_NO,
+        items: cart.map(x => ({
+          name: x.name,
+          price: x.price,
+          qty: x.qty
+        }))
+      };
 
-        function changeQty(id, delta) {
-            const item = cart.find(c => c.id === id);
-            item.qty += delta;
-            if (item.qty <= 0) {
-                cart = cart.filter(c => c.id !== id);
-            }
-            updateCartUI();
-        }
+      const res = await fetch(GAS_API_URL, {
+        method: "POST",
+        headers: { "Content-Type": "text/plain;charset=utf-8" },
+        body: JSON.stringify(payload)
+      });
 
-        function toggleCart() {
-            const sidebar = document.getElementById('cart-sidebar');
-            const overlay = document.getElementById('overlay');
-            sidebar.classList.toggle('translate-x-full');
-            overlay.classList.toggle('hidden');
-        }
+      const data = await res.json();
 
-        function filterMenu(cat) {
-            document.querySelectorAll('.category-btn').forEach(btn => {
-                btn.classList.remove('active');
-                if(btn.innerText.includes(cat) || (cat === 'all' && btn.innerText === '全部')) {
-                    btn.classList.add('active');
-                }
-            });
-            displayMenu(cat);
-        }
+      if (!data || !data.ok) {
+        alert(data && data.message ? data.message : "送出失敗");
+        btn.disabled = false;
+        btn.innerText = "送出訂單";
+        return;
+      }
 
-        // 初始載入
-        displayMenu();
-    </script>
+      alert("訂單已送出，謝謝！");
+      cart = [];
+      updateCartUI();
+      toggleCart();
+
+    } catch (err) {
+      alert("送出失敗：" + err.message);
+    }
+
+    btn.disabled = false;
+    btn.innerText = "送出訂單";
+  }
+
+  // 初始載入
+  initTable();
+  displayMenu();
+</script>
+
 </body>
 </html>
