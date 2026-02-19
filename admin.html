@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>阿根早點｜後台送餐管理</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+
+<body class="bg-gray-50 min-h-screen">
+
+<script>
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec";
+</script>
+
+<!-- 登入畫面 -->
+<div id="login-view" class="min-h-screen flex items-center justify-center p-4">
+  <div class="bg-white w-full max-w-md rounded-2xl shadow p-6 border">
+    <div class="text-2xl font-black text-red-600 mb-2">阿根早點｜後台</div>
+    <div class="text-gray-600 mb-6">請輸入密碼登入</div>
+
+    <input id="pwd" type="password"
+      class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring"
+      placeholder="輸入後台密碼" />
+
+    <button onclick="login()"
+      class="w-full mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl">
+      登入
+    </button>
+
+    <div id="login-msg" class="text-center text-red-600 mt-4 font-bold"></div>
+  </div>
+</div>
+
+<!-- 後台主畫面 -->
+<div id="admin-view" class="hidden">
+  <header class="bg-red-600 text-white p-4 shadow sticky top-0 z-50">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      <h1 class="text-xl font-bold">阿根早點｜未送餐後台（合併訂單）</h1>
+      <div class="flex gap-2">
+        <button onclick="loadData()"
+          class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-bold">
+          重新整理
+        </button>
+        <button onclick="logout()"
+          class="bg-black/20 hover:bg-black/30 px-4 py-2 rounded-lg font-bold">
+          登出
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto p-4">
+    <div id="status" class="text-gray-600 mb-4"></div>
+    <div id="tables" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+  </main>
+</div>
+
+<script>
+  let LOGGED_IN = false;
+
+  function money(n){ return "$" + Number(n||0); }
+
+  function fmtTime(v){
+    if(!v) return "";
+    try{
+      const d = new Date(v);
+      if(isNaN(d.getTime())) return "";
+      const pad = x => String(x).padStart(2,"0");
+      return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+    }catch(e){
+      return "";
+    }
+  }
+
+  async function api(payload){
+    const res = await fetch(GAS_API_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(payload)
+    });
+    return await res.json();
+  }
+
+  async function login(){
+    const pwd = document.getElementById("pwd").value;
+    document.getElementById("login-msg").innerText = "驗證中...";
+
+    try{
+      const data = await api({ action:"adminLogin", password: pwd });
+      if(data && data.ok){
+        LOGGED_IN = true;
+        document.getElementById("login-view").classList.add("hidden");
+        document.getElementById("admin-view").classList.remove("hidden");
+        loadData();
+        setInterval(() => { if(LOGGED_IN) loadData(); }, 8000);
+      }else{
+        document.getElementById("login-msg").innerText = "密碼錯誤";
+      }
+    }catch(err){
+      document.getElementById("login-msg").innerText = "登入失敗：" + err.message;
+    }
+  }
+
+  function logout(){
+    LOGGED_IN = false;
+    document.getElementById("pwd").value = "";
+    document.getElementById("login-msg").innerText = "";
+    document.getElementById("admin-view").classList.add("hidden");
+    document.getElementById("login-view").classList.remove("hidden");
+  }
+
+  async function loadData(){
+    if(!LOGGED_IN) return;
+
+    document.getElementById("status").innerText = "載入中...";
+    document.getElementById("tables").innerHTML = "";
+
+    try{
+      const data = await api({ action:"getPendingOrdersMerged" });
+      if(!data || !data.ok){
+        document.getElementById("status").innerText = "載入失敗";
+        return;
+      }
+
+      const list = data.data || [];
+      if(list.length === 0){
+        document.getElementById("status").innerText = "目前沒有未送餐訂單 ✅";
+        return;
+      }
+
+      document.getElementById("status").innerText = `未送餐桌數：${list.length} 桌`;
+      renderTables(list);
+
+    }catch(err){
+      document.getElementById("status").innerText = "載入失敗：" + err.message;
+    }
+  }
+
+  function renderTables(data){
+    const root = document.getElementById("tables");
+    root.innerHTML = "";
+
+    data.forEach(t => {
+      const itemsHtml = (t.items || []).map(x => `
+        <div class="flex justify-between border-b py-2">
+          <div class="pr-2">
+            <div class="font-bold">${x.item}</div>
+            <div class="text-sm text-gray-500">${money(x.price)} x ${x.qty}</div>
+          </div>
+          <div class="font-bold text-red-600">${money(x.subtotal)}</div>
+        </div>
+      `).join("");
+
+      const el = document.createElement("div");
+      el.className = "bg-white rounded-2xl shadow-sm border p-4";
+
+      el.innerHTML = `
+        <div class="flex items-center justify-between mb-2">
+          <div class="text-xl font-black">桌號 ${t.table}</div>
+          <button class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-xl"
+            onclick="markServed('${t.table}')">
+            已送餐
+          </button>
+        </div>
+
+        <div class="text-sm text-gray-500 mb-3">
+          訂單時間：<span class="font-bold text-gray-700">${fmtTime(t.time)}</span>
+        </div>
+
+        <div class="text-sm text-gray-500 mb-2">菜單（合併後直式）</div>
+        <div class="space-y-1">${itemsHtml}</div>
+
+        <div class="flex justify-between mt-4 pt-3 border-t">
+          <div class="font-bold text-gray-700">總計</div>
+          <div class="font-black text-xl text-red-600">${money(t.total)}</div>
+        </div>
+      `;
+
+      root.appendChild(el);
+    });
+  }
+
+  async function markServed(table){
+    if(!confirm(`確定桌號 ${table} 已送餐？`)) return;
+
+    try{
+      const data = await api({ action:"markTableServed", table });
+      if(!data || !data.ok){
+        alert(data && data.message ? data.message : "操作失敗");
+        return;
+      }
+      loadData();
+    }catch(err){
+      alert("操作失敗：" + err.message);
+    }
+  }
+</script>
+
+</body>
+</html>
