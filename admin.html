@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>阿胖早點 - 後台管理</title>
+<title>阿胖早點｜後台送餐管理</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <style>
   body { font-family: "Microsoft JhengHei", sans-serif; background-color: #f9fafb; }
@@ -13,80 +13,157 @@
 <body class="p-4">
 
 <h1 class="text-2xl font-bold mb-4">後台訂單管理</h1>
+
+<div class="flex gap-3 mb-4">
+  <button onclick="loadOrders()" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-xl font-bold">重新整理</button>
+  <button onclick="logout()" class="bg-gray-600 hover:bg-gray-700 text-white px-4 py-2 rounded-xl font-bold">登出</button>
+</div>
+
+<div id="status" class="text-gray-600 mb-4"></div>
 <div id="orders-container" class="space-y-6"></div>
 
 <script>
 const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec"; // 改成你的 URL
 const ADMIN_PASSWORD = "123456"; // 後台密碼
 let token = ADMIN_PASSWORD;
+let lastPendingCount = 0;
 
-// 取得並顯示訂單
-async function loadOrders() {
+function money(n){ return "$" + Number(n||0); }
+
+// 取得訂單
+async function loadOrders(){
+  document.getElementById("status").innerText = "載入中...";
   const res = await fetch(GAS_API_URL, {
     method:"POST",
     headers:{"Content-Type":"text/plain;charset=utf-8"},
     body:JSON.stringify({action:"getPendingOrdersMerged", token})
   });
   const data = await res.json();
-  if(!data.ok){ alert(data.message); return; }
+  if(!data.ok){ alert(data.message); document.getElementById("status").innerText="載入失敗"; return; }
 
   const container = document.getElementById("orders-container");
   container.innerHTML = '';
-  data.data.forEach(table=>{
-    const tableDiv = document.createElement("div");
-    tableDiv.className="bg-white p-4 rounded-lg shadow-md border border-gray-200";
-    let itemsHTML = table.items.map(item=>`<li>${item.item} x ${item.qty} ($${item.price})</li>`).join('');
-    tableDiv.innerHTML = `
-      <h2 class="text-xl font-bold mb-2">桌號 ${table.table}</h2>
-      <ul class="mb-2 list-disc pl-5">${itemsHTML}</ul>
-      <p class="mb-2 font-bold">總計：$${table.total}</p>
-      <div class="flex gap-3">
-        <button class="bg-green-500 text-white px-4 py-2 rounded" onclick="serveTable(this,'${table.table}')">送餐</button>
-        <button class="bg-blue-500 text-white px-4 py-2 rounded" onclick="checkoutTable(this,'${table.table}')">結帳</button>
+  const list = data.data || [];
+  lastPendingCount = list.length;
+
+  if(list.length === 0){
+    document.getElementById("status").innerText = "目前沒有未送餐訂單 ✅";
+    return;
+  }
+
+  document.getElementById("status").innerText = `未送餐桌數：${list.length} 桌`;
+
+  list.forEach(table=>{
+    const itemsHTML = (table.items||[]).map(item=>`
+      <div class="flex justify-between border-b py-2">
+        <div class="pr-2">
+          <div class="font-bold">${item.item}</div>
+          <div class="text-sm text-gray-500">${money(item.price)} x ${item.qty}</div>
+        </div>
+        <div class="font-bold text-red-600">${money(item.subtotal)}</div>
+      </div>
+    `).join('');
+
+    const el = document.createElement("div");
+    el.className = "bg-white p-4 rounded-2xl shadow-sm border";
+
+    el.innerHTML = `
+      <div class="flex items-center justify-between mb-2">
+        <div class="text-xl font-black">桌號 ${table.table}</div>
+        <div class="flex gap-2">
+          <button class="bg-green-600 hover:bg-green-700 text-white font-bold px-4 py-2 rounded-xl" onclick="serveTable(this,'${table.table}')">送餐</button>
+          <button class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2 rounded-xl" onclick="checkoutTable(this,'${table.table}')">結帳</button>
+        </div>
+      </div>
+      <div class="text-sm text-gray-500 mb-3">訂單時間：<span class="font-bold text-gray-700">${table.time||""}</span></div>
+      <div class="text-sm text-gray-500 mb-2">菜單（合併後直式）</div>
+      <div class="space-y-1">${itemsHTML}</div>
+      <div class="flex justify-between mt-4 pt-3 border-t">
+        <div class="font-bold text-gray-700">總計</div>
+        <div class="font-black text-xl text-red-600">${money(table.total)}</div>
       </div>
     `;
-    container.appendChild(tableDiv);
+    container.appendChild(el);
   });
 }
 
 // 送餐按鈕
 async function serveTable(btn, table){
-  btn.disabled=true; btn.innerText="送餐中...";
-  const res = await fetch(GAS_API_URL,{
-    method:"POST",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify({action:"markTableServed", table, token})
-  });
-  const data = await res.json();
-  if(data.ok){
-    btn.innerText="已送餐";
-    btn.disabled=true;
-  } else {
-    alert(data.message); btn.disabled=false; btn.innerText="送餐";
+  if(!confirm(`確定桌號 ${table} 已送餐？`)) return;
+  btn.disabled = true;
+  btn.innerText = "送餐中...";
+  try{
+    const res = await fetch(GAS_API_URL,{
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action:"markTableServed", table, token})
+    });
+    const data = await res.json();
+    if(data.ok){
+      btn.innerText = "已送餐";
+      btn.disabled = true;
+    } else {
+      alert(data.message); btn.disabled=false; btn.innerText="送餐";
+    }
+  }catch(err){
+    alert("操作失敗：" + err.message); btn.disabled=false; btn.innerText="送餐";
   }
 }
 
 // 結帳按鈕
 async function checkoutTable(btn, table){
-  btn.disabled=true; btn.innerText="結帳中...";
-  const res = await fetch(GAS_API_URL,{
-    method:"POST",
-    headers:{"Content-Type":"text/plain;charset=utf-8"},
-    body:JSON.stringify({action:"checkoutTable", table, token})
-  });
-  const data = await res.json();
-  if(data.ok){
-    btn.innerText="已結帳";
-    btn.disabled=true;
-    // 清除桌號訂單顯示
-    btn.closest("div.bg-white").remove();
-  } else {
-    alert(data.message); btn.disabled=false; btn.innerText="結帳";
+  if(!confirm(`確定桌號 ${table} 結帳？`)) return;
+  btn.disabled = true; btn.innerText = "結帳中...";
+  try{
+    const res = await fetch(GAS_API_URL,{
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action:"checkoutTable", table, token})
+    });
+    const data = await res.json();
+    if(data.ok){
+      btn.innerText = "已結帳";
+      btn.disabled = true;
+      // 清除桌號顯示
+      btn.closest("div.bg-white").remove();
+      document.getElementById("status").innerText = `未送餐桌數：${--lastPendingCount} 桌`;
+    } else {
+      alert(data.message); btn.disabled=false; btn.innerText="結帳";
+    }
+  }catch(err){
+    alert("操作失敗：" + err.message); btn.disabled=false; btn.innerText="結帳";
   }
 }
 
+// 登出
+function logout(){
+  token = "";
+  location.reload();
+}
+
+// 自動每5秒檢查新訂單
+setInterval(async ()=>{
+  try{
+    const res = await fetch(GAS_API_URL,{
+      method:"POST",
+      headers:{"Content-Type":"text/plain;charset=utf-8"},
+      body:JSON.stringify({action:"getPendingOrdersMerged", token})
+    });
+    const data = await res.json();
+    if(data.ok){
+      const list = data.data || [];
+      if(list.length !== lastPendingCount){
+        lastPendingCount = list.length;
+        document.getElementById("status").innerText = list.length===0 ? "目前沒有未送餐訂單 ✅" : `未送餐桌數：${list.length} 桌`;
+        loadOrders();
+      }
+    }
+  }catch(e){ console.error("自動刷新失敗", e); }
+},5000);
+
 // 初始化
 loadOrders();
+
 </script>
 
 </body>
