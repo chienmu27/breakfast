@@ -3,122 +3,86 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>阿胖早點 - 後台管理</title>
+<title>阿胖早點後台</title>
 <script src="https://cdn.tailwindcss.com"></script>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-<style>
-  body { font-family: "Noto Sans TC", sans-serif; background-color: #f9fafb; }
-  .btn-order { padding: 6px 12px; border-radius: 0.375rem; cursor: pointer; font-weight: bold; }
-  .btn-serve { background-color: #ef4444; color: white; }
-  .btn-served { background-color: #9ca3af; color: white; cursor: default; }
-  .btn-checkout { background-color: #10b981; color: white; }
-</style>
 </head>
-<body class="p-4">
+<body class="bg-gray-50">
 
-<header class="mb-4">
-  <h1 class="text-2xl font-bold">阿胖早點 - 後台訂單管理</h1>
-</header>
+<header class="bg-red-600 text-white p-4 text-center font-bold text-xl">阿胖早點 - 後台訂單管理</header>
 
-<div class="mb-4">
-  <button onclick="fetchOrders()" class="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700">刷新訂單</button>
-</div>
-
-<div id="orders-container" class="space-y-6"></div>
+<main class="container mx-auto p-4">
+  <div id="orders-container" class="space-y-6"></div>
+</main>
 
 <script>
-const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec";
-const ADMIN_TOKEN = "123456"; // 後端設定的管理密碼
+const GAS_API_URL="https://script.google.com/macros/s/AKfycb.../exec"; // 替換你的實際 URL
+const TOKEN="123456"; // 管理密碼 token
 
-// 取得未送餐訂單並顯示
-async function fetchOrders() {
-  const container = document.getElementById("orders-container");
-  container.innerHTML = "<p>載入中...</p>";
-  try {
-    const res = await fetch(GAS_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action: "getPendingOrdersMerged", token: ADMIN_TOKEN })
-    });
-    const data = await res.json();
-    if (!data.ok) { container.innerHTML = "<p>讀取失敗</p>"; return; }
-    renderOrders(data.data);
-  } catch(err) {
-    container.innerHTML = `<p>讀取失敗: ${err.message}</p>`;
-  }
+async function loadOrders(){
+  const res=await fetch(GAS_API_URL,{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({action:"getPendingOrdersMerged", token:TOKEN})
+  });
+  const data=await res.json();
+  if(!data.ok){ alert(data.message); return; }
+  displayOrders(data.data);
 }
 
-// 渲染訂單
-function renderOrders(orders) {
-  const container = document.getElementById("orders-container");
-  if (!orders || orders.length===0) { container.innerHTML="<p>目前無訂單</p>"; return; }
-
-  container.innerHTML = "";
+function displayOrders(orders){
+  const container=document.getElementById("orders-container");
+  container.innerHTML="";
   orders.forEach(order=>{
-    const div = document.createElement("div");
-    div.className = "bg-white p-4 rounded shadow";
-    div.id = `table-${order.table}`;
+    const div=document.createElement("div");
+    div.className="bg-white p-4 rounded shadow";
+    div.id="table-"+order.table;
 
-    let itemsHtml = "";
+    let itemsHtml="";
     order.items.forEach(it=>{
-      itemsHtml += `<div class="flex justify-between"><span>${it.item} x ${it.qty}</span><span>$${it.subtotal}</span></div>`;
+      itemsHtml+=`<p>${it.item} x ${it.qty} - $${it.subtotal}</p>`;
     });
 
-    div.innerHTML = `
-      <div class="flex justify-between items-center mb-2">
-        <h2 class="text-lg font-bold">桌號 ${order.table}</h2>
-        <div class="flex gap-2">
-          <button class="btn-order btn-serve" onclick="markServed('${order.table}', this)">送餐</button>
-          <button class="btn-order btn-checkout" onclick="checkout('${order.table}', this)">結帳</button>
-        </div>
-      </div>
+    div.innerHTML=`
+      <h3 class="font-bold text-lg mb-2">桌號 ${order.table} - 總計 $${order.total}</h3>
       <div class="mb-2">${itemsHtml}</div>
-      <div class="text-right font-bold text-red-600">總計：$${order.total}</div>
+      <div class="flex gap-2">
+        <button class="bg-orange-500 text-white px-3 py-1 rounded" onclick="markServed('${order.table}', this)">送餐</button>
+        <button class="bg-green-600 text-white px-3 py-1 rounded" onclick="markPaid('${order.table}', this)">結帳</button>
+      </div>
     `;
     container.appendChild(div);
   });
 }
 
-// 標記已送餐
-async function markServed(table, btn) {
-  btn.disabled = true;
-  try {
-    const res = await fetch(GAS_API_URL, {
-      method:"POST",
-      headers: {"Content-Type":"text/plain;charset=utf-8"},
-      body: JSON.stringify({ action:"markTableServed", token:ADMIN_TOKEN, table })
-    });
-    const data = await res.json();
-    if(data.ok){
-      btn.innerText = "已送餐";
-      btn.classList.remove("btn-serve");
-      btn.classList.add("btn-served");
-    } else { alert(data.message); btn.disabled=false; }
-  } catch(err){ alert(err.message); btn.disabled=false; }
+// 標記送餐
+async function markServed(table, btn){
+  const res=await fetch(GAS_API_URL,{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({action:"markTableServed", table, token:TOKEN})
+  });
+  const data=await res.json();
+  if(data.ok){ btn.innerText="已送餐"; btn.disabled=true; } else alert(data.message);
 }
 
-// 結帳
-async function checkout(table, btn) {
-  btn.disabled = true;
-  try {
-    // 將 H 欄標記為 "已結帳"
-    const res = await fetch(GAS_API_URL, {
-      method:"POST",
-      headers: {"Content-Type":"text/plain;charset=utf-8"},
-      body: JSON.stringify({ action:"markTableCheckout", token:ADMIN_TOKEN, table })
-    });
-    const data = await res.json();
-    if(data.ok){
-      alert(`桌號 ${table} 已結帳`);
-      // 移除該桌顯示
-      const div = document.getElementById(`table-${table}`);
-      if(div) div.remove();
-    } else { alert(data.message); btn.disabled=false; }
-  } catch(err){ alert(err.message); btn.disabled=false; }
+// 標記結帳
+async function markPaid(table, btn){
+  const res=await fetch(GAS_API_URL,{
+    method:"POST",
+    headers:{"Content-Type":"text/plain;charset=utf-8"},
+    body:JSON.stringify({action:"markTablePaid", table, token:TOKEN})
+  });
+  const data=await res.json();
+  if(data.ok){
+    btn.innerText="已結帳"; btn.disabled=true;
+    const div=document.getElementById("table-"+table);
+    if(div) div.remove();
+  } else alert(data.message);
 }
 
 // 初始載入
-fetchOrders();
+loadOrders();
+setInterval(loadOrders,5000); // 每5秒自動刷新
 </script>
 
 </body>
