@@ -57,8 +57,12 @@
 </div>
 
 <script>
+  // ====== 狀態 ======
   let LOGGED_IN = false;
+  let SESSION_TOKEN = "";   // 用密碼當 token（後端也要用同一個方式驗證）
+  let AUTO_TIMER = null;
 
+  // ====== 工具 ======
   function money(n){ return "$" + Number(n||0); }
 
   function fmtTime(v){
@@ -73,29 +77,63 @@
     }
   }
 
+  // ====== API ======
   async function api(payload){
+    // 所有後台操作都自動加 token（登入後）
+    if(LOGGED_IN && SESSION_TOKEN){
+      payload.token = SESSION_TOKEN;
+    }
+
     const res = await fetch(GAS_API_URL, {
       method: "POST",
+      mode: "cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
     });
-    return await res.json();
+
+    // 防止 GAS 回傳 HTML 導致 json() 爆掉
+    const text = await res.text();
+    try{
+      return JSON.parse(text);
+    }catch(e){
+      // 顯示前 200 字方便你判斷（通常是 Google 登入頁）
+      throw new Error("後端回傳非JSON，可能是權限/部署問題：\n" + text.slice(0, 200));
+    }
   }
 
+  // ====== 登入/登出 ======
   async function login(){
-    const pwd = document.getElementById("pwd").value;
+    const pwd = document.getElementById("pwd").value.trim();
     document.getElementById("login-msg").innerText = "驗證中...";
+
+    if(!pwd){
+      document.getElementById("login-msg").innerText = "請輸入密碼";
+      return;
+    }
 
     try{
       const data = await api({ action:"adminLogin", password: pwd });
+
       if(data && data.ok){
         LOGGED_IN = true;
+        SESSION_TOKEN = pwd; // 用密碼當 token
+
         document.getElementById("login-view").classList.add("hidden");
         document.getElementById("admin-view").classList.remove("hidden");
-        loadData();
-        setInterval(() => { if(LOGGED_IN) loadData(); }, 8000);
+
+        document.getElementById("login-msg").innerText = "";
+
+        // 先載入一次
+        await loadData();
+
+        // 避免重複 setInterval
+        if(AUTO_TIMER) clearInterval(AUTO_TIMER);
+        AUTO_TIMER = setInterval(() => {
+          if(LOGGED_IN) loadData();
+        }, 8000);
+
       }else{
-        document.getElementById("login-msg").innerText = "密碼錯誤";
+        document.getElementById("login-msg").innerText = (data && data.message) ? data.message : "密碼錯誤";
       }
     }catch(err){
       document.getElementById("login-msg").innerText = "登入失敗：" + err.message;
@@ -104,12 +142,19 @@
 
   function logout(){
     LOGGED_IN = false;
+    SESSION_TOKEN = "";
+
+    if(AUTO_TIMER) clearInterval(AUTO_TIMER);
+    AUTO_TIMER = null;
+
     document.getElementById("pwd").value = "";
     document.getElementById("login-msg").innerText = "";
+
     document.getElementById("admin-view").classList.add("hidden");
     document.getElementById("login-view").classList.remove("hidden");
   }
 
+  // ====== 載入資料 ======
   async function loadData(){
     if(!LOGGED_IN) return;
 
@@ -117,9 +162,12 @@
     document.getElementById("tables").innerHTML = "";
 
     try{
+      // ★ 這裡必須帶 token（api() 已自動加）
       const data = await api({ action:"getPendingOrdersMerged" });
+
       if(!data || !data.ok){
-        document.getElementById("status").innerText = "載入失敗";
+        document.getElementById("status").innerText =
+          (data && data.message) ? ("載入失敗：" + data.message) : "載入失敗";
         return;
       }
 
@@ -137,6 +185,7 @@
     }
   }
 
+  // ====== 畫面 ======
   function renderTables(data){
     const root = document.getElementById("tables");
     root.innerHTML = "";
@@ -181,20 +230,32 @@
     });
   }
 
+  // ====== 已送餐 ======
   async function markServed(table){
     if(!confirm(`確定桌號 ${table} 已送餐？`)) return;
 
     try{
+      // ★ 這裡也必須帶 token（api() 已自動加）
       const data = await api({ action:"markTableServed", table });
+
       if(!data || !data.ok){
         alert(data && data.message ? data.message : "操作失敗");
         return;
       }
+
       loadData();
+
     }catch(err){
       alert("操作失敗：" + err.message);
     }
   }
+
+  // ====== 小功能：按 Enter 直接登入 ======
+  document.addEventListener("keydown", (e) => {
+    if(e.key === "Enter" && !LOGGED_IN){
+      login();
+    }
+  });
 </script>
 
 </body>
