@@ -11,19 +11,24 @@
     body { font-family: 'Noto Sans TC', sans-serif; background-color: #f9fafb; }
     .category-btn.active { background-color: #ef4444; color: white; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
-    /* 跑馬燈樣式 */
-    .marquee-container {
-      background-color: transparent;
+    
+    /* 跑馬燈樣式：無色透明背景與置中動畫 */
+    .marquee-wrapper {
+      width: 100%;
       overflow: hidden;
-      white-space: nowrap;
-      padding: 10px 0;
-      border-bottom: 1px solid #fed7aa;
+      background: transparent;
+      padding: 15px 0;
+      border-bottom: 1px solid #eee;
     }
-    .marquee-content {
+    .marquee-text {
       display: inline-block;
-      animation: marquee 15s linear infinite;
-      font-size: 1.125rem;
-      color: #4b5563;
+      white-space: nowrap;
+      font-size: 1.25rem;
+      font-weight: bold;
+      color: #374151;
+      animation: marquee 12s linear infinite;
+      text-align: center;
+      width: 100%;
     }
     @keyframes marquee {
       0% { transform: translateX(100%); }
@@ -35,25 +40,26 @@
 <body class="pb-20">
 
 <header class="bg-red-600 text-white p-4 shadow-md sticky top-0 z-50">
-  <div class="container mx-auto flex justify-center items-center gap-8">
-    <div class="text-xl bg-white/20 px-4 py-1.5 rounded-full scale-125">
-      桌號：<span id="table-no">-</span>
+  <div class="container mx-auto flex justify-between items-center">
+    <h1 class="text-2xl font-bold">阿胖早點</h1>
+    
+    <div class="flex items-center gap-6 flex-grow justify-center">
+      <div class="text-lg bg-white/20 px-4 py-1 rounded-full scale-125">
+        桌號：<span id="table-no">-</span>
+      </div>
+      <div onclick="toggleCart()" class="relative cursor-pointer flex items-center gap-2 scale-125">
+        <span class="hidden md:inline-block font-bold">檢查購物車</span>
+        <i class="fas fa-shopping-cart text-2xl"></i>
+        <span id="cart-count" class="absolute -top-2 -right-2 bg-yellow-400 text-red-800 text-xs font-bold px-1.5 py-0.5 rounded-full">0</span>
+      </div>
     </div>
-    <div onclick="toggleCart()" class="relative cursor-pointer flex items-center gap-2 scale-125">
-      <span class="text-lg font-bold">檢查購物車</span>
-      <i class="fas fa-shopping-cart text-2xl"></i>
-      <span id="cart-count" class="absolute -top-2 -right-2 bg-yellow-400 text-red-800 text-xs font-bold px-1.5 py-0.5 rounded-full">0</span>
-    </div>
+    
+    <div class="w-10"></div>
   </div>
 </header>
 
-<div class="bg-orange-100 marquee-container">
-  <div class="marquee-content" id="marquee-text">載入最新消息中...</div>
-</div>
-
-<div class="bg-orange-50 p-6 text-center border-b border-orange-200">
-  <h2 class="text-3xl font-bold text-gray-800 mb-2">早安！今天要吃點什麼？</h2>
-  <p class="text-gray-600 text-lg">招牌酥脆蛋餅、法式吐司，開啟活力的一天</p>
+<div class="marquee-wrapper">
+  <div class="marquee-text" id="marquee-info">正在載入公告資訊...</div>
 </div>
 
 <nav id="category-nav" class="sticky top-[72px] bg-white border-b overflow-x-auto whitespace-nowrap z-40 px-4 py-3 flex gap-2 no-scrollbar">
@@ -82,6 +88,7 @@
 <div id="overlay" onclick="toggleCart()" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50"></div>
 
 <script>
+  // GAS API URL
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec";
 
   let menuData = [];
@@ -97,16 +104,16 @@
     return await res.json();
   }
 
-  // 獲取設定 (跑馬燈與驗證碼後端檢驗)
+  // 抓取設定（跑馬燈 C2）
   async function fetchConfig() {
     try {
       const res = await fetch(`${GAS_API_URL}?action=getConfig`);
       const result = await res.json();
       if (result.ok) {
-        document.getElementById('marquee-text').innerText = result.marqueeText;
+        document.getElementById('marquee-info').innerText = result.marqueeText || "歡迎光臨阿胖早點！";
       }
     } catch (e) {
-      document.getElementById('marquee-text').innerText = "歡迎光臨阿胖早點！";
+      document.getElementById('marquee-info').innerText = "今日招牌：酥脆蛋餅、法式吐司，開啟活力的一天！";
     }
   }
 
@@ -121,7 +128,7 @@
         document.getElementById('loading-spinner').style.display = 'none';
       }
     } catch (e) {
-      document.getElementById('loading-spinner').innerHTML = "無法連接伺服器，請確認 GAS 設定";
+      document.getElementById('loading-spinner').innerHTML = "菜單載入失敗，請確認網路連接";
     }
   }
 
@@ -137,7 +144,7 @@
     });
   }
 
-  // 4. 修改菜單卡片為 - 數量 + 模式
+  // 4. 菜單卡片：修改為 - 數量 +
   function displayMenu(f) {
     const container = document.getElementById('menu-container');
     container.innerHTML = '';
@@ -150,14 +157,14 @@
         <div class="bg-white rounded-xl shadow-sm border p-4 flex justify-between items-center">
           <div class="flex-grow">
             <span class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded">${i.category}</span>
-            <h3 class="font-bold mt-1">${i.name}</h3>
+            <h3 class="font-bold mt-1 text-lg">${i.name}</h3>
             <p class="text-xs text-gray-400">${i.desc}</p>
-            <p class="text-red-600 font-bold mt-2">$${i.price}</p>
+            <p class="text-red-600 font-bold mt-2 text-lg">$${i.price}</p>
           </div>
-          <div class="flex items-center gap-3 bg-gray-50 p-1 rounded-full border">
-            <button onclick="removeFromCart(${i.id})" class="bg-white text-gray-600 w-8 h-8 rounded-full shadow-sm border flex items-center justify-center">-</button>
-            <span class="font-bold min-w-[20px] text-center" id="qty-${i.id}">${qty}</span>
-            <button onclick="addToCart(${i.id})" class="bg-red-500 text-white w-8 h-8 rounded-full shadow-sm flex items-center justify-center">+</button>
+          <div class="flex items-center gap-3 bg-gray-100 p-1.5 rounded-full border border-gray-200">
+            <button onclick="removeFromCart(${i.id})" class="bg-white text-gray-700 w-8 h-8 rounded-full shadow-sm flex items-center justify-center hover:bg-gray-200 active:scale-90 transition">-</button>
+            <span class="font-bold min-w-[20px] text-center text-lg" id="qty-${i.id}">${qty}</span>
+            <button onclick="addToCart(${i.id})" class="bg-red-600 text-white w-8 h-8 rounded-full shadow-sm flex items-center justify-center hover:bg-red-700 active:scale-90 transition">+</button>
           </div>
         </div>`;
     });
@@ -168,42 +175,33 @@
     const exist = cart.find(c => c.id === id);
     if (exist) exist.qty++; else cart.push({...i, qty:1});
     updateUI();
-    refreshItemQty(id);
+    document.getElementById(`qty-${id}`).innerText = cart.find(c => c.id === id).qty;
   }
 
   function removeFromCart(id) {
-    const exist = cart.find(c => c.id === id);
-    if (exist) {
-      exist.qty--;
-      if (exist.qty <= 0) {
-        cart = cart.filter(c => c.id !== id);
-      }
-    }
-    updateUI();
-    refreshItemQty(id);
-  }
-
-  function refreshItemQty(id) {
-    const qtySpan = document.getElementById(`qty-${id}`);
-    if (qtySpan) {
-      const item = cart.find(c => c.id === id);
-      qtySpan.innerText = item ? item.qty : 0;
+    const idx = cart.findIndex(c => c.id === id);
+    if (idx > -1) {
+      cart[idx].qty--;
+      const finalQty = cart[idx].qty;
+      if (finalQty <= 0) cart.splice(idx, 1);
+      updateUI();
+      document.getElementById(`qty-${id}`).innerText = finalQty > 0 ? finalQty : 0;
     }
   }
 
   function updateUI() {
     const list = document.getElementById('cart-items');
-    list.innerHTML = cart.length ? '' : '<p class="text-gray-400">空空如也</p>';
+    list.innerHTML = cart.length ? '' : '<p class="text-gray-400 text-center py-10">購物車目前是空的</p>';
     let total = 0, count = 0;
     cart.forEach(c => {
       total += c.price * c.qty; count += c.qty;
       list.innerHTML += `
-        <div class="flex justify-between items-center text-sm border-b pb-2">
+        <div class="flex justify-between items-center text-sm border-b pb-2 mb-2">
           <div>
-            <div class="font-bold">${c.name}</div>
+            <div class="font-bold text-gray-800">${c.name}</div>
             <div class="text-gray-500">$${c.price} x ${c.qty}</div>
           </div>
-          <span class="font-bold text-red-600">$${c.price*c.qty}</span>
+          <span class="font-bold text-red-600 text-base">$${c.price*c.qty}</span>
         </div>`;
     });
     document.getElementById('cart-count').innerText = count;
@@ -211,20 +209,20 @@
   }
 
   async function submitOrder() {
-    if(!TABLE_NO) return alert("請掃碼進入或輸入桌號");
-    if(!cart.length) return alert("沒選餐點");
+    if(!TABLE_NO) return alert("請由桌上 QR Code 進入系統");
+    if(!cart.length) return alert("請先選擇餐點");
     const btn = document.getElementById('btn-submit');
     btn.disabled = true; btn.innerText = "傳送中...";
     try {
       const res = await postData({ action: "submitOrder", table: TABLE_NO, items: cart });
       if(res.ok) { 
-        alert("送單成功"); 
+        alert("訂單已送出！請稍候餐點"); 
         cart = []; 
         updateUI(); 
         toggleCart();
-        displayMenu('all'); // 重置所有加減按鈕數字
+        displayMenu('all');
       }
-    } catch(e) { alert("傳送失敗"); }
+    } catch(e) { alert("連線失敗，請檢查網路"); }
     btn.disabled = false; btn.innerText = "送出訂單";
   }
 
@@ -242,7 +240,7 @@
 
   window.onload = () => {
     TABLE_NO = new URLSearchParams(window.location.search).get('table') || "";
-    document.getElementById('table-no').innerText = TABLE_NO || "未知";
+    document.getElementById('table-no').innerText = TABLE_NO || "待測";
     fetchConfig();
     fetchMenu();
   };
