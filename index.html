@@ -104,7 +104,6 @@
     return await res.json();
   }
 
-  // 抓取設定（跑馬燈 C2）
   async function fetchConfig() {
     try {
       const res = await fetch(`${GAS_API_URL}?action=getConfig`);
@@ -144,16 +143,19 @@
     });
   }
 
-  // 4. 菜單卡片：修改為 - 數量 +
+  // 4. 修正後的菜單渲染邏輯
   function displayMenu(f) {
     const container = document.getElementById('menu-container');
-    container.innerHTML = '';
+    container.innerHTML = ''; // 清空容器
     const items = f === 'all' ? menuData : menuData.filter(i => i.category === f);
+    
+    // 使用 DocumentFragment 或一次性字串拼接優化效能並確保 ID 獨立
+    let htmlContent = '';
     items.forEach(i => {
       const cartItem = cart.find(c => c.id === i.id);
       const qty = cartItem ? cartItem.qty : 0;
       
-      container.innerHTML += `
+      htmlContent += `
         <div class="bg-white rounded-xl shadow-sm border p-4 flex justify-between items-center">
           <div class="flex-grow">
             <span class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded">${i.category}</span>
@@ -168,14 +170,22 @@
           </div>
         </div>`;
     });
+    container.innerHTML = htmlContent;
   }
 
   function addToCart(id) {
     const i = menuData.find(m => m.id === id);
-    const exist = cart.find(c => c.id === id);
-    if (exist) exist.qty++; else cart.push({...i, qty:1});
+    let exist = cart.find(c => c.id === id);
+    if (exist) {
+      exist.qty++;
+    } else {
+      exist = {...i, qty:1};
+      cart.push(exist);
+    }
     updateUI();
-    document.getElementById(`qty-${id}`).innerText = cart.find(c => c.id === id).qty;
+    // 確保只更新對應的 ID 顯示
+    const qtyLabel = document.getElementById(`qty-${id}`);
+    if (qtyLabel) qtyLabel.innerText = exist.qty;
   }
 
   function removeFromCart(id) {
@@ -183,9 +193,13 @@
     if (idx > -1) {
       cart[idx].qty--;
       const finalQty = cart[idx].qty;
-      if (finalQty <= 0) cart.splice(idx, 1);
+      if (finalQty <= 0) {
+        cart.splice(idx, 1);
+      }
       updateUI();
-      document.getElementById(`qty-${id}`).innerText = finalQty > 0 ? finalQty : 0;
+      // 確保只更新對應的 ID 顯示
+      const qtyLabel = document.getElementById(`qty-${id}`);
+      if (qtyLabel) qtyLabel.innerText = finalQty > 0 ? finalQty : 0;
     }
   }
 
@@ -233,6 +247,7 @@
 
   function filterMenu(c) {
     document.querySelectorAll('.category-btn').forEach(b => {
+      // 修正：依據按鈕內容文字或全部標籤來切換 active
       b.classList.toggle('active', b.innerText === c || (c==='all' && b.innerText==='全部'));
     });
     displayMenu(c);
