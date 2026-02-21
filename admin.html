@@ -16,7 +16,7 @@
 <body class="bg-gray-100 min-h-screen">
 
 <script>
-  // 請確保此處網址正確
+  // 請確保此處為您最新的 Google Apps Script 部署網址
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec";
 </script>
 
@@ -56,7 +56,7 @@
     <section id="view-history" class="tab-content hidden">
       <div class="bg-white rounded-3xl shadow-sm border p-6">
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
-          <h2 class="text-xl font-bold text-gray-700">歷史銷售紀錄</h2>
+          <h2 class="text-xl font-bold text-gray-700">所有訂單紀錄</h2>
           <button onclick="reqAuth('deleteAll')" class="bg-red-50 text-red-600 px-4 py-2 rounded-xl font-bold border border-red-100 hover:bg-red-600 hover:text-white transition-all">
             <i class="fas fa-trash-alt mr-2"></i>清空所有資料
           </button>
@@ -70,7 +70,7 @@
                 <th class="px-4 py-4">品項</th>
                 <th class="px-4 py-4">金額</th>
                 <th class="px-4 py-4">狀態</th>
-                <th class="px-4 py-4">操作</th>
+                <th class="px-4 py-4 text-center">操作</th>
               </tr>
             </thead>
             <tbody id="history-tbody" class="text-sm"></tbody>
@@ -153,14 +153,10 @@
   let tableButtonState = {};
   let tempMenuData = {};
 
-  // 輔助函式：轉換狀態文字
   function getStatusText(status) {
-    switch(status) {
-      case 'completed': return '<span class="text-gray-500 bg-gray-100 px-2 py-1 rounded">已結單</span>';
-      case 'pending': return '<span class="text-red-600 bg-red-100 px-2 py-1 rounded">準備中</span>';
-      case 'served': return '<span class="text-green-600 bg-green-100 px-2 py-1 rounded">已送餐</span>';
-      default: return status;
-    }
+    if (status === 'completed') return '<span class="text-gray-500 bg-gray-100 px-2 py-1 rounded">已結單</span>';
+    if (status === 'pending') return '<span class="text-red-600 bg-red-100 px-2 py-1 rounded">準備中</span>';
+    return `<span class="text-green-600 bg-green-100 px-2 py-1 rounded">${status}</span>`;
   }
 
   async function api(payload){
@@ -181,6 +177,9 @@
       SESSION_TOKEN = pwd;
       document.getElementById("login-view").classList.add("hidden");
       document.getElementById("admin-view").classList.remove("hidden");
+      // 登入成功後先抓一次菜單備用
+      const menuRes = await api({ action: "getMenu" });
+      if(menuRes.ok) menuData = menuRes.data;
       loadData();
     } else {
       document.getElementById("login-msg").innerText = "密碼錯誤";
@@ -204,7 +203,7 @@
     const root = document.getElementById("tables-grid");
     root.innerHTML = "";
     if(!res.data || res.data.length === 0) {
-      root.innerHTML = '<div class="col-span-full text-center py-20 text-gray-400">目前沒有新訂單</div>';
+      root.innerHTML = '<div class="col-span-full text-center py-20 text-gray-400 font-bold">目前沒有任何準備中的訂單</div>';
       return;
     }
     res.data.forEach(t => {
@@ -240,25 +239,25 @@
   // 2. 訂單總表
   async function loadHistory() {
     const tbody = document.getElementById('history-tbody');
-    tbody.innerHTML = '<tr><td colspan="6" class="p-10 text-center">讀取中...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="6" class="p-10 text-center">正在讀取銷售紀錄...</td></tr>';
     const res = await api({ action: "getOrderHistory" });
     if(res.ok) {
-      if(res.data.length === 0) {
+      if(!res.data || res.data.length === 0) {
         tbody.innerHTML = '<tr><td colspan="6" class="p-10 text-center text-gray-400">尚無銷售紀錄</td></tr>';
         return;
       }
-      // 這裡假設試算表 row index 是從第 2 行開始，且順序與歷史列表對應
-      // 為了精準刪除，建議 GS 端的 getOrderHistory 也要回傳 row index
+      // 因為後端 getOrderHistory 有做 .reverse()，所以計算 Row 需注意
+      // 假設資料從試算表第 2 行開始
+      const totalCount = res.data.length;
       tbody.innerHTML = res.data.map((r, index) => {
-        // 計算該筆在試算表中的實際行數 (考慮 reverse 了)
-        const rowInSheet = res.data.length - index + 1; 
+        const rowInSheet = totalCount - index + 1; 
         return `
         <tr class="border-b hover:bg-gray-50 transition-all">
           <td class="px-4 py-4 text-gray-400 text-xs">${new Date(r.time).toLocaleString()}</td>
           <td class="px-4 py-4 font-bold text-center">${r.table}</td>
           <td class="px-4 py-4">${r.name} x ${r.qty}</td>
           <td class="px-4 py-4 font-bold text-red-600">$${r.subtotal}</td>
-          <td class="px-4 py-4 text-xs font-bold">${getStatusText(r.status)}</td>
+          <td class="px-4 py-4 text-xs font-bold text-center">${getStatusText(r.status)}</td>
           <td class="px-4 py-4 text-center">
             <button onclick="reqAuth('deleteOrder', ${rowInSheet})" class="text-gray-300 hover:text-red-600 transition-all">
               <i class="fas fa-trash-alt"></i>
@@ -268,24 +267,31 @@
     }
   }
 
-  // 3. 菜單管理
+  // 3. 菜單管理 (修正讀取與顯示)
   async function loadAdminMenu() {
     const tbody = document.getElementById('admin-menu-tbody');
-    tbody.innerHTML = '<tr><td colspan="5" class="p-10 text-center">讀取中...</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="p-10 text-center">正在抓取最新菜單...</td></tr>';
+    
     const res = await api({ action: "getMenu" });
     if(res.ok) {
       menuData = res.data;
-      tbody.innerHTML = res.data.map(m => `
+      if(!menuData || menuData.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="p-10 text-center text-gray-400">目前菜單內沒有品項</td></tr>';
+        return;
+      }
+      tbody.innerHTML = menuData.map(m => `
         <tr class="border-b hover:bg-gray-50 transition-all">
-          <td class="px-4 py-4 font-bold text-red-600">${m.category}</td>
+          <td class="px-4 py-4 font-bold text-red-600">${m.category || '未分類'}</td>
           <td class="px-4 py-4 font-black">${m.name}</td>
-          <td class="px-4 py-4 text-gray-400 text-xs">${m.desc}</td>
+          <td class="px-4 py-4 text-gray-400 text-xs">${m.desc || ''}</td>
           <td class="px-4 py-4 font-bold">$${m.price}</td>
           <td class="px-4 py-4 text-center space-x-2">
             <button onclick="openMenuModal('edit', ${m.row})" class="text-blue-500 hover:scale-125 transition-transform"><i class="fas fa-edit"></i></button>
             <button onclick="reqAuth('deleteMenu', ${m.row})" class="text-gray-300 hover:text-red-500 transition-all"><i class="fas fa-trash"></i></button>
           </td>
         </tr>`).join('');
+    } else {
+      tbody.innerHTML = '<tr><td colspan="5" class="p-10 text-center text-red-500">菜單載入失敗，請檢查網路</td></tr>';
     }
   }
 
@@ -293,10 +299,13 @@
     const modal = document.getElementById('modal-menu-edit');
     modal.classList.add('modal-active');
     if(mode === 'add') {
+      document.getElementById('menu-modal-title').innerText = "新增品項";
       document.getElementById('menu-row-id').value = "";
       ['cat','name','desc','price'].forEach(k => document.getElementById('menu-'+k).value = "");
     } else {
+      document.getElementById('menu-modal-title').innerText = "編輯品項";
       const item = menuData.find(m => m.row === rowId);
+      if(!item) return;
       document.getElementById('menu-row-id').value = rowId;
       document.getElementById('menu-cat').value = item.category;
       document.getElementById('menu-name').value = item.name;
@@ -315,6 +324,7 @@
       desc: document.getElementById('menu-desc').value,
       price: document.getElementById('menu-price').value
     };
+    if(!tempMenuData.name || !tempMenuData.price) return alert('名稱與價格為必填');
     reqAuth(tempMenuData.row ? 'editMenu' : 'addMenu');
   }
 
@@ -323,11 +333,13 @@
     modal.classList.add('modal-active');
     document.getElementById('input-auth-pwd').value = "";
     
-    // 設置標題文字
     const title = document.getElementById('auth-title');
-    if(type === 'deleteOrder') title.innerText = "確認刪除訂單？";
-    else if(type === 'deleteMenu') title.innerText = "確認刪除菜單品項？";
-    else title.innerText = "請輸入驗證碼";
+    const desc = document.getElementById('auth-desc');
+    
+    if(type === 'deleteOrder') { title.innerText = "刪除單筆訂單？"; desc.innerText = "確定要移除此筆紀錄？請輸入驗證碼"; }
+    else if(type === 'deleteMenu') { title.innerText = "刪除菜單品項？"; desc.innerText = "刪除後不可復原，請輸入驗證碼"; }
+    else if(type === 'deleteAll') { title.innerText = "清空所有訂單？"; desc.innerText = "這將刪除全部銷售數據！請輸入驗證碼"; }
+    else { title.innerText = "確認操作"; desc.innerText = "請輸入驗證碼以儲存變更"; }
 
     document.getElementById('btn-auth-confirm').onclick = async () => {
       const pwd = document.getElementById('input-auth-pwd').value;
@@ -338,24 +350,23 @@
       if (type === 'deleteAll') payload.action = "deleteAllOrders";
       else if (type === 'deleteMenu') { payload.action = "deleteMenuItem"; payload.row = rowId; }
       else if (type === 'deleteOrder') { 
-          // 這裡借用 deleteMenuItem 的邏輯來刪除訂單工作表的一行
-          // 如果您想更嚴謹，可在 GS 增加 deleteOrder 指令
-          payload.action = "deleteMenuItem"; // 只要 GS 邏輯是刪除指定 Row
+          // 此處需搭配 GS 的修改，傳入 targetSheet 參數
+          payload.action = "deleteMenuItem"; 
           payload.row = rowId; 
-          payload.targetSheet = "order"; // 可選：在 GS 判斷要刪除哪張表
+          payload.targetSheet = "order"; 
       }
       else if (type === 'addMenu') { payload = { ...payload, ...tempMenuData, action: "addMenuItem" }; }
       else if (type === 'editMenu') { payload = { ...payload, ...tempMenuData, action: "editMenuItem" }; }
       
       const res = await api(payload);
       if(res.ok) {
-        alert('操作成功');
+        alert('執行成功');
         closeModal('modal-auth');
         closeModal('modal-menu-edit');
         if(type === 'deleteOrder' || type === 'deleteAll') loadHistory(); 
         else loadAdminMenu();
       } else {
-        alert(res.message);
+        alert(res.message || '驗證失敗');
       }
     };
   }
