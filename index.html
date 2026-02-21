@@ -140,14 +140,14 @@
     });
   }
 
-  // 修改：在 HTML 中傳入 this 以便定位元素
   function displayMenu(f) {
     const container = document.getElementById('menu-container');
     container.innerHTML = '';
     const items = f === 'all' ? menuData : menuData.filter(i => i.category === f);
     
-    items.forEach(i => {
-      const cartItem = cart.find(c => c.id === i.id);
+    items.forEach((i, index) => {
+      // 使用餐點名稱作為判斷購物車數量的依據，避免 ID 重複造成影響
+      const cartItem = cart.find(c => c.name === i.name);
       const qty = cartItem ? cartItem.qty : 0;
       
       const card = document.createElement('div');
@@ -160,52 +160,57 @@
             <p class="text-red-600 font-bold mt-2 text-lg">$${i.price}</p>
           </div>
           <div class="flex items-center gap-3 bg-gray-100 p-1.5 rounded-full border border-gray-200">
-            <button onclick="removeFromCart(this, ${i.id})" class="bg-white text-gray-700 w-8 h-8 rounded-full shadow-sm flex items-center justify-center hover:bg-gray-200 active:scale-90 transition">-</button>
+            <button onclick="removeFromCart(this, '${i.name}')" class="bg-white text-gray-700 w-8 h-8 rounded-full shadow-sm flex items-center justify-center hover:bg-gray-200 active:scale-90 transition">-</button>
             <span class="qty-display font-bold min-w-[20px] text-center text-lg">${qty}</span>
-            <button onclick="addToCart(this, ${i.id})" class="bg-red-600 text-white w-8 h-8 rounded-full shadow-sm flex items-center justify-center hover:bg-red-700 active:scale-90 transition">+</button>
+            <button onclick="addToCart(this, '${i.name}')" class="bg-red-600 text-white w-8 h-8 rounded-full shadow-sm flex items-center justify-center hover:bg-red-700 active:scale-90 transition">+</button>
           </div>`;
       container.appendChild(card);
     });
   }
 
-  // 修改：接收 btn 參數，利用 DOM 導向更新同一個卡片內的數量標籤
-  function addToCart(btn, id) {
-    const i = menuData.find(m => m.id === id);
-    let exist = cart.find(c => c.id === id);
-    if (exist) {
-      exist.qty++;
-    } else {
-      exist = {...i, qty:1};
-      cart.push(exist);
-    }
-    updateUI();
+  function addToCart(btn, itemName) {
+    const itemInfo = menuData.find(m => m.name === itemName);
+    let cartItem = cart.find(c => c.name === itemName);
     
-    // 定位到按鈕旁邊的數量標籤
+    if (cartItem) {
+      cartItem.qty++;
+    } else {
+      cartItem = { ...itemInfo, qty: 1 };
+      cart.push(cartItem);
+    }
+    
+    // 更新介面
     const qtySpan = btn.parentElement.querySelector('.qty-display');
-    if (qtySpan) qtySpan.innerText = exist.qty;
+    qtySpan.innerText = cartItem.qty;
+    updateUI();
   }
 
-  function removeFromCart(btn, id) {
-    const idx = cart.findIndex(c => c.id === id);
-    if (idx > -1) {
-      cart[idx].qty--;
-      const finalQty = cart[idx].qty;
-      if (finalQty <= 0) {
-        cart.splice(idx, 1);
+  function removeFromCart(btn, itemName) {
+    const cartIdx = cart.findIndex(c => c.name === itemName);
+    let finalQty = 0;
+    
+    if (cartIdx > -1) {
+      cart[cartIdx].qty--;
+      finalQty = cart[cartIdx].qty;
+      if (cart[cartIdx].qty <= 0) {
+        cart.splice(cartIdx, 1);
       }
-      updateUI();
-      
-      const qtySpan = btn.parentElement.querySelector('.qty-display');
-      if (qtySpan) qtySpan.innerText = finalQty > 0 ? finalQty : 0;
     }
+    
+    // 更新介面
+    const qtySpan = btn.parentElement.querySelector('.qty-display');
+    qtySpan.innerText = finalQty;
+    updateUI();
   }
 
   function updateUI() {
     const list = document.getElementById('cart-items');
     list.innerHTML = cart.length ? '' : '<p class="text-gray-400 text-center py-10">購物車目前是空的</p>';
     let total = 0, count = 0;
+    
     cart.forEach(c => {
-      total += c.price * c.qty; count += c.qty;
+      total += c.price * c.qty; 
+      count += c.qty;
       list.innerHTML += `
         <div class="flex justify-between items-center text-sm border-b pb-2 mb-2">
           <div>
@@ -215,6 +220,7 @@
           <span class="font-bold text-red-600 text-base">$${c.price*c.qty}</span>
         </div>`;
     });
+    
     document.getElementById('cart-count').innerText = count;
     document.getElementById('total-price').innerText = `$${total}`;
   }
@@ -230,7 +236,7 @@
         alert("訂單已送出！請稍候餐點"); 
         cart = []; 
         updateUI(); 
-        toggleCart();
+        if(document.getElementById('cart-sidebar').classList.contains('translate-x-0')) toggleCart();
         displayMenu('all');
       }
     } catch(e) { alert("連線失敗，請檢查網路"); }
