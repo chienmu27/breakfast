@@ -5,225 +5,365 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>阿胖早點｜後台管理系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
   <style>
     @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
-    body { font-family: 'Noto Sans TC', sans-serif; }
+    body { font-family: 'Noto Sans TC', sans-serif; background-color: #f3f4f6; }
+    .nav-btn.active { background-color: white; color: #dc2626; border-bottom: 3px solid #dc2626; }
   </style>
 </head>
 
-<body class="bg-gray-50 min-h-screen">
+<body class="min-h-screen flex flex-col">
 
-<script>
-  // GAS API 網址 (請確保已部署為「所有人」)
-  const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec";
-</script>
+<header class="bg-red-600 text-white shadow-md sticky top-0 z-50">
+  <div class="max-w-7xl mx-auto px-4">
+    <div class="flex items-center justify-between h-16">
+      <div class="flex items-center gap-2">
+        <i class="fas fa-store-alt text-2xl"></i>
+        <h1 class="text-xl font-black">阿胖早點｜後台</h1>
+      </div>
+      <div class="flex h-16">
+        <button onclick="switchTab('orders')" id="btn-orders" class="nav-btn active px-4 flex items-center gap-2 font-bold transition-all">
+          <i class="fas fa-clipboard-list"></i> 訂單管理
+        </button>
+        <button onclick="switchTab('history')" id="btn-history" class="nav-btn px-4 flex items-center gap-2 font-bold transition-all">
+          <i class="fas fa-history"></i> 訂單總表
+        </button>
+        <button onclick="switchTab('menu')" id="btn-menu" class="nav-btn px-4 flex items-center gap-2 font-bold transition-all">
+          <i class="fas fa-utensils"></i> 菜單管理
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
 
-<div id="login-view" class="min-h-screen flex items-center justify-center p-4">
-  <div class="bg-white w-full max-w-md rounded-2xl shadow-xl p-8 border border-gray-100">
-    <div class="text-3xl font-black text-red-600 mb-2">阿胖早點</div>
-    <div class="text-gray-500 mb-8 font-bold">管理後台登入</div>
-    
-    <label class="block text-gray-700 text-sm font-bold mb-2">管理員密碼 (設定工作表 A2)</label>
-    <input id="pwd" type="password" 
-           class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-red-500 transition-all font-mono" 
-           placeholder="請輸入後台密碼" />
-    
-    <button onclick="login()" 
-            class="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-xl shadow-lg transition-transform active:scale-95">
-      登入管理系統
-    </button>
-    <div id="login-msg" class="text-center text-red-500 mt-4 font-bold min-h-[1.5rem]"></div>
+<main class="flex-grow max-w-7xl mx-auto w-full p-4 md:p-6">
+
+  <section id="panel-orders" class="tab-panel">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-black text-gray-800">即時待處理訂單</h2>
+      <button onclick="loadPendingOrders()" class="bg-white border px-4 py-2 rounded-lg hover:bg-gray-50 font-bold shadow-sm">
+        <i class="fas fa-sync-alt mr-1"></i> 重新整理
+      </button>
+    </div>
+    <div id="status-pending" class="text-gray-500 mb-4 font-bold">載入中...</div>
+    <div id="pending-tables" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+  </section>
+
+  <section id="panel-history" class="tab-panel hidden">
+    <div class="bg-white p-6 rounded-2xl shadow-sm border mb-6">
+      <div class="flex flex-wrap gap-4 items-end justify-between">
+        <div class="flex flex-wrap gap-4">
+          <div>
+            <label class="block text-xs font-bold text-gray-400 mb-1">篩選日期</label>
+            <select id="hist-filter-date" onchange="applyHistoryFilters()" class="border rounded-lg px-3 py-2 bg-gray-50 outline-none"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-400 mb-1">人員/桌號</label>
+            <select id="hist-filter-name" onchange="applyHistoryFilters()" class="border rounded-lg px-3 py-2 bg-gray-50 outline-none"></select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-gray-400 mb-1">品項</label>
+            <select id="hist-filter-item" onchange="applyHistoryFilters()" class="border rounded-lg px-3 py-2 bg-gray-50 outline-none"></select>
+          </div>
+        </div>
+        <div class="flex gap-2">
+            <button onclick="loadHistoryData()" class="bg-blue-500 text-white px-4 py-2 rounded-lg font-bold"><i class="fas fa-search"></i> 查詢</button>
+            <button onclick="triggerDeleteAllOrders()" class="bg-red-100 text-red-600 px-4 py-2 rounded-lg font-bold hover:bg-red-200">清空所有資料</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left">
+          <thead class="bg-gray-50 text-gray-500 text-xs font-bold uppercase tracking-wider">
+            <tr>
+              <th class="px-6 py-4">時間</th>
+              <th class="px-6 py-4">桌號/人員</th>
+              <th class="px-6 py-4">品項</th>
+              <th class="px-6 py-4 text-right">單價</th>
+              <th class="px-6 py-4 text-center">數量</th>
+              <th class="px-6 py-4 text-right">小計</th>
+              <th class="px-6 py-4 text-center">狀態</th>
+            </tr>
+          </thead>
+          <tbody id="history-tbody" class="divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+      <div class="bg-gray-50 p-4 flex justify-end gap-8 text-sm">
+        <div class="font-bold text-gray-500">總計數量: <span id="hist-total-qty" class="text-gray-900 text-lg">0</span></div>
+        <div class="font-bold text-gray-500">總計金額: <span id="hist-total-amt" class="text-red-600 text-lg">$0</span></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-menu" class="tab-panel hidden">
+    <div class="flex justify-between items-center mb-6">
+      <h2 class="text-2xl font-black text-gray-800">菜單品項管理</h2>
+      <button onclick="openMenuModal('add')" class="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 font-bold shadow-md">
+        <i class="fas fa-plus mr-1"></i> 新增品項
+      </button>
+    </div>
+    <div class="bg-white rounded-2xl shadow-sm border overflow-hidden">
+      <table class="w-full text-left">
+        <thead class="bg-gray-50 text-gray-500 text-xs font-bold uppercase tracking-wider">
+          <tr>
+            <th class="px-6 py-4">分類</th>
+            <th class="px-6 py-4">名稱</th>
+            <th class="px-6 py-4 hidden md:table-cell">描述</th>
+            <th class="px-6 py-4">價格</th>
+            <th class="px-6 py-4 text-center">操作</th>
+          </tr>
+        </thead>
+        <tbody id="admin-menu-tbody" class="divide-y divide-gray-100"></tbody>
+      </table>
+    </div>
+  </section>
+</main>
+
+<div id="modal-menu-edit" class="fixed inset-0 bg-black/50 hidden z-[60] flex items-center justify-center p-4">
+  <div class="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+    <div class="p-6 border-b flex justify-between items-center">
+      <h3 id="menu-modal-title" class="text-xl font-black">編輯品項</h3>
+      <button onclick="closeMenuModal()" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+    </div>
+    <div class="p-6 space-y-4">
+      <input type="hidden" id="menu-row-id">
+      <div>
+        <label class="block text-sm font-bold text-gray-700 mb-1">分類</label>
+        <input id="menu-cat" type="text" class="w-full border rounded-xl px-4 py-2 outline-none focus:border-red-500" placeholder="例如：蛋餅">
+      </div>
+      <div>
+        <label class="block text-sm font-bold text-gray-700 mb-1">名稱</label>
+        <input id="menu-name" type="text" class="w-full border rounded-xl px-4 py-2 outline-none focus:border-red-500" placeholder="例如：起司蛋餅">
+      </div>
+      <div>
+        <label class="block text-sm font-bold text-gray-700 mb-1">描述</label>
+        <input id="menu-desc" type="text" class="w-full border rounded-xl px-4 py-2 outline-none focus:border-red-500" placeholder="產品簡介">
+      </div>
+      <div>
+        <label class="block text-sm font-bold text-gray-700 mb-1">價格</label>
+        <input id="menu-price" type="number" class="w-full border rounded-xl px-4 py-2 outline-none focus:border-red-500" placeholder="0">
+      </div>
+    </div>
+    <div class="p-6 bg-gray-50 flex gap-3">
+      <button onclick="closeMenuModal()" class="flex-1 py-3 font-bold text-gray-500 bg-white border rounded-xl">取消</button>
+      <button onclick="triggerMenuSave()" class="flex-1 py-3 font-bold text-white bg-red-600 rounded-xl">儲存</button>
+    </div>
   </div>
 </div>
 
-<div id="admin-view" class="hidden">
-  <header class="bg-red-600 text-white p-4 shadow-md sticky top-0 z-50">
-    <div class="max-w-6xl mx-auto flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <h1 class="text-xl font-black tracking-tight">阿胖早點｜訂單管理</h1>
-      </div>
-      <div class="flex gap-2">
-        <button onclick="loadData()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-bold text-sm">重新整理</button>
-        <button onclick="logout()" class="bg-black/20 hover:bg-black/30 px-4 py-2 rounded-lg font-bold text-sm">登出</button>
-      </div>
-    </div>
-  </header>
-
-  <main class="max-w-6xl mx-auto p-4 md:p-6">
-    <div id="status" class="text-gray-500 font-bold mb-6 flex items-center gap-2">
-      </div>
-    
-    <div id="tables" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
-  </main>
-</div>
-
 <script>
-  let LOGGED_IN = false;
-  let SESSION_TOKEN = "";
-  let lastPendingCount = 0;
-  // 記錄每一桌的 UI 按鈕狀態
-  let tableButtonState = {}; 
+  const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec";
+  
+  let menuData = [];
+  let historyData = [];
+  let tableButtonState = {};
 
-  function money(n){ return "$" + Number(n||0).toLocaleString(); }
-
-  function fmtTime(v){
-    if(!v) return "";
-    try{
-      const d = new Date(v);
-      if(isNaN(d.getTime())) return "";
-      const pad = x => String(x).padStart(2,"0");
-      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    }catch(e){ return ""; }
-  }
-
-  // 共用 API 呼叫
-  async function api(payload){
-    if(LOGGED_IN && SESSION_TOKEN) payload.token = SESSION_TOKEN;
+  // 通用呼叫 API 函式 (已移除密碼驗證邏輯)
+  async function callApi(payload) {
     const res = await fetch(GAS_API_URL, {
       method: "POST",
-      mode: "cors",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
       body: JSON.stringify(payload)
     });
     return await res.json();
   }
 
-  async function login(){
-    const pwd = document.getElementById("pwd").value.trim();
-    if(!pwd) return;
-    const msg = document.getElementById("login-msg");
-    msg.innerText = "驗證中...";
+  // 面板切換
+  function switchTab(tab) {
+    document.querySelectorAll('.tab-panel').forEach(p => p.classList.add('hidden'));
+    document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+    document.getElementById(`panel-${tab}`).classList.remove('hidden');
+    document.getElementById(`btn-${tab}`).classList.add('active');
     
-    try{
-      // 傳送密碼至後端 adminLogin，後端會從「設定」工作表 A2 抓取密碼比對
-      const data = await api({ action:"adminLogin", password: pwd });
-      if(data && data.ok){
-        LOGGED_IN = true;
-        SESSION_TOKEN = data.token; // 後端傳回的 token (通常是 A2 的值)
-        document.getElementById("login-view").classList.add("hidden");
-        document.getElementById("admin-view").classList.remove("hidden");
-        loadData();
-        // 每 10 秒檢查一次新訂單
-        setInterval(checkNewOrders, 10000);
-      }else{
-        msg.innerText = "密碼錯誤，請確認試算表設定";
+    if(tab === 'orders') loadPendingOrders();
+    if(tab === 'history') loadHistoryData();
+    if(tab === 'menu') loadAdminMenu();
+  }
+
+  // --- 1. 訂單管理 ---
+  async function loadPendingOrders() {
+    const status = document.getElementById("status-pending");
+    status.innerText = "正在連線伺服器...";
+    try {
+      const res = await callApi({ action: "getPendingOrdersMerged" });
+      if(res.ok) {
+        const list = res.data || [];
+        status.innerText = list.length === 0 ? "目前沒有待處理訂單 ✅" : `目前有 ${list.length} 桌訂單待處理`;
+        renderPendingTables(list);
       }
-    }catch(err){ 
-      msg.innerText = "連線失敗，請檢查 GAS 部署"; 
-    }
+    } catch(e) { status.innerText = "連線失敗"; }
   }
 
-  function logout(){
-    location.reload();
-  }
-
-  async function loadData(){
-    if(!LOGGED_IN) return;
-    const statusEl = document.getElementById("status");
-    statusEl.innerHTML = `<span class="inline-block animate-spin">⏳</span> 載入數據中...`;
-    
-    try{
-      const data = await api({ action:"getPendingOrdersMerged" });
-      if(data && data.ok){
-        const list = data.data || [];
-        lastPendingCount = list.length;
-        statusEl.innerText = list.length === 0 ? "目前沒有待處理訂單 ✅" : `目前有 ${list.length} 桌訂單待處理`;
-        renderTables(list);
-      }
-    }catch(err){ 
-      statusEl.innerText = "無法載入訂單資料";
-    }
-  }
-
-  function renderTables(data){
-    const root = document.getElementById("tables");
+  function renderPendingTables(data) {
+    const root = document.getElementById("pending-tables");
     root.innerHTML = "";
+    data.forEach(t => {
+      const isServed = (t.status === "served");
+      const itemsHtml = (t.items||[]).map(x => `
+        <div class="flex justify-between py-2 border-b border-gray-50 text-sm">
+          <span><span class="font-bold">${x.item}</span> <span class="text-red-500">x${x.qty}</span></span>
+          <span class="text-gray-400">$${x.subtotal}</span>
+        </div>`).join("");
 
-    data.forEach(t=>{
-      // 如果後端傳來的狀態已經是 served，強制按鈕狀態為 completed (結帳)
-      if (t.status === "served") {
-        tableButtonState[t.table] = "completed";
-      } else if (!tableButtonState[t.table]) {
-        // 若無紀錄則預設為待送餐
-        tableButtonState[t.table] = "served";
-      }
-
-      const itemsHtml = (t.items||[]).map(x=>`
-        <div class="flex justify-between border-b border-gray-100 py-3 text-sm">
-          <div>
-            <span class="font-bold text-gray-800">${x.item}</span> 
-            <span class="text-red-500 font-bold ml-1">x${x.qty}</span>
-          </div>
-          <div class="font-bold text-gray-400">${money(x.subtotal)}</div>
-        </div>
-      `).join("");
-
-      const isWaitingCheckout = tableButtonState[t.table] === "completed";
-
-      const el = document.createElement("div");
-      el.className = `rounded-3xl shadow-lg border-2 p-5 transition-all duration-300 ${isWaitingCheckout ? 'bg-orange-50 border-orange-400' : 'bg-white border-white'}`;
-
-      el.innerHTML = `
-        <div class="flex items-start justify-between mb-4">
-          <div>
-            <div class="text-2xl font-black text-gray-800">桌號 ${t.table}</div>
-            <div class="text-[10px] text-gray-400 uppercase tracking-widest mt-1">下單 ${fmtTime(t.time)}</div>
-          </div>
-          <button id="btn-${t.table}" 
-            onclick="handleTableAction('${t.table}')"
-            class="font-black px-6 py-3 rounded-2xl shadow-md transition-all active:scale-90 ${isWaitingCheckout ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}">
-            ${isWaitingCheckout ? '💰 結帳' : '🚚 送餐'}
+      const card = document.createElement("div");
+      card.className = `p-5 rounded-3xl shadow-lg border-2 transition-all ${isServed ? 'bg-orange-50 border-orange-400' : 'bg-white border-white'}`;
+      card.innerHTML = `
+        <div class="flex justify-between items-start mb-4">
+          <div class="text-2xl font-black">桌號 ${t.table}</div>
+          <button onclick="handleOrderAction('${t.table}', '${isServed ? 'completed' : 'served'}')" 
+            class="px-5 py-2 rounded-xl font-bold text-white shadow-md ${isServed ? 'bg-blue-600' : 'bg-green-600'}">
+            ${isServed ? '💰 結帳' : '🚚 送餐'}
           </button>
         </div>
-        <div class="space-y-1 bg-white/50 rounded-2xl p-2">${itemsHtml}</div>
-        <div class="flex justify-between items-center mt-4 px-2">
-          <div class="font-bold text-gray-500 uppercase text-xs tracking-wider">Total</div>
-          <div class="font-black text-2xl text-red-600">${money(t.total)}</div>
-        </div>
+        <div class="space-y-1 mb-4">${itemsHtml}</div>
+        <div class="text-right font-black text-xl text-red-600">Total $${t.total}</div>
       `;
-      root.appendChild(el);
+      root.appendChild(card);
     });
   }
 
-  async function handleTableAction(tableNo) {
-    const currentState = tableButtonState[tableNo]; 
+  async function handleOrderAction(table, status) {
+    if(status === 'completed' && !confirm(`桌號 ${table} 確認結帳？`)) return;
+    const res = await callApi({ action: "markTableStatus", table: table, status: status });
+    if(res.ok) loadPendingOrders();
+  }
+
+  // --- 2. 訂單總表 ---
+  async function loadHistoryData() {
+    const tbody = document.getElementById('history-tbody');
+    tbody.innerHTML = '<tr><td colspan="7" class="py-10 text-center"><i class="fas fa-spinner fa-spin"></i> 載入中...</td></tr>';
     
-    if (currentState === "served") {
-      // 送餐動作
-      try {
-        const res = await api({ action: "markTableStatus", table: tableNo, status: "served" });
-        if (res.ok) {
-          tableButtonState[tableNo] = "completed"; 
-          loadData(); 
-        }
-      } catch (err) { alert("操作失敗，請重新整理"); }
+    const res = await callApi({ action: "getOrderHistory" }); // 請確保 GS 有對應 getOrderHistory
+    if(res.ok) {
+      historyData = res.data;
+      initHistoryFilters();
+      applyHistoryFilters();
     } else {
-      // 結帳動作
-      if (!confirm(`桌號 ${tableNo} 確認已完成結帳並清除訂單？`)) return;
-      try {
-        const res = await api({ action: "markTableStatus", table: tableNo, status: "completed" });
-        if (res.ok) {
-          delete tableButtonState[tableNo]; 
-          loadData(); 
-        }
-      } catch (err) { alert("操作失敗"); }
+        // 若後端暫不支援 getOrderHistory，此處會報錯，需在後端補上該 function
+        tbody.innerHTML = '<tr><td colspan="7" class="py-10 text-center text-red-400">無法獲取歷史資料，請確認後端功能</td></tr>';
     }
   }
 
-  // 自動檢查有無訂單增減
-  async function checkNewOrders(){
-    if(!LOGGED_IN) return;
-    try{
-      const data = await api({ action:"getPendingOrdersMerged" });
-      if(data && data.ok && data.data.length !== lastPendingCount){
-        loadData();
-      }
-    }catch(err){}
+  function initHistoryFilters() {
+    const dates = new Set(), items = new Set(), names = new Set();
+    historyData.forEach(r => {
+      const d = new Date(r.time);
+      dates.add(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`);
+      items.add(r.item);
+      names.add(r.table || r.name);
+    });
+    
+    const fillSel = (id, set, label) => {
+        document.getElementById(id).innerHTML = `<option value="all">所有${label}</option>` + 
+        [...set].sort().reverse().map(v => `<option value="${v}">${v}</option>`).join('');
+    };
+    fillSel('hist-filter-date', dates, '日期');
+    fillSel('hist-filter-item', items, '品項');
+    fillSel('hist-filter-name', names, '桌號/人員');
   }
 
-  document.addEventListener("keydown",(e)=>{
-    if(e.key==="Enter" && !LOGGED_IN) login();
-  });
+  function applyHistoryFilters() {
+    const dVal = document.getElementById('hist-filter-date').value;
+    const iVal = document.getElementById('hist-filter-item').value;
+    const nVal = document.getElementById('hist-filter-name').value;
+    
+    const filtered = historyData.filter(r => {
+      const d = new Date(r.time);
+      const rD = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+      return (dVal === 'all' || rD === dVal) && 
+             (iVal === 'all' || r.item === iVal) && 
+             (nVal === 'all' || (r.table || r.name) === nVal);
+    });
+
+    const tbody = document.getElementById('history-tbody');
+    let tQty = 0, tAmt = 0;
+    
+    tbody.innerHTML = filtered.map(r => {
+      tQty += Number(r.qty); tAmt += Number(r.subtotal);
+      return `<tr class="border-b text-sm">
+        <td class="px-6 py-4 text-gray-400">${new Date(r.time).toLocaleString()}</td>
+        <td class="px-6 py-4 font-bold">${r.table || r.name}</td>
+        <td class="px-6 py-4">${r.item}</td>
+        <td class="px-6 py-4 text-right">$${r.price}</td>
+        <td class="px-6 py-4 text-center">${r.qty}</td>
+        <td class="px-6 py-4 text-right font-bold">$${r.subtotal}</td>
+        <td class="px-6 py-4 text-center"><span class="px-2 py-1 rounded-full text-xs bg-gray-100">${r.status}</span></td>
+      </tr>`;
+    }).join('');
+    
+    document.getElementById('hist-total-qty').innerText = tQty;
+    document.getElementById('hist-total-amt').innerText = `$${tAmt}`;
+  }
+
+  async function triggerDeleteAllOrders() {
+    if(!confirm("警告！這將刪除試算表中「所有」訂單資料，確定執行？")) return;
+    const res = await callApi({ action: "deleteAllOrders" });
+    if(res.ok) loadHistoryData();
+  }
+
+  // --- 3. 菜單管理 ---
+  async function loadAdminMenu() {
+    const res = await callApi({ action: "getMenu" });
+    if(!res.ok) return;
+    menuData = res.data;
+    const tbody = document.getElementById('admin-menu-tbody');
+    tbody.innerHTML = menuData.map(m => `
+      <tr class="border-b">
+        <td class="px-6 py-4 font-bold text-orange-600">${m.category}</td>
+        <td class="px-6 py-4">${m.name}</td>
+        <td class="px-6 py-4 hidden md:table-cell text-xs text-gray-400 truncate max-w-xs">${m.desc}</td>
+        <td class="px-6 py-4 font-bold">$${m.price}</td>
+        <td class="px-6 py-4 text-center">
+            <button onclick="openMenuModal('edit', ${m.id})" class="text-blue-500 mr-3"><i class="fas fa-edit"></i></button>
+            <button onclick="deleteMenuItem(${m.id})" class="text-red-400"><i class="fas fa-trash-alt"></i></button>
+        </td>
+      </tr>`).join('');
+  }
+
+  function openMenuModal(mode, id = null) {
+    const modal = document.getElementById('modal-menu-edit');
+    modal.classList.remove('hidden');
+    if(mode === 'add') {
+      document.getElementById('menu-modal-title').innerText = "新增品項";
+      document.getElementById('menu-row-id').value = "";
+      ['cat','name','desc','price'].forEach(f => document.getElementById(`menu-${f}`).value = "");
+    } else {
+      const item = menuData.find(m => m.id === id);
+      document.getElementById('menu-modal-title').innerText = "編輯品項";
+      document.getElementById('menu-row-id').value = item.id;
+      document.getElementById('menu-cat').value = item.category;
+      document.getElementById('menu-name').value = item.name;
+      document.getElementById('menu-desc').value = item.desc;
+      document.getElementById('menu-price').value = item.price;
+    }
+  }
+
+  function closeMenuModal() { document.getElementById('modal-menu-edit').classList.add('hidden'); }
+
+  async function triggerMenuSave() {
+    const payload = {
+      action: document.getElementById('menu-row-id').value ? "editMenuItem" : "addMenuItem",
+      id: document.getElementById('menu-row-id').value,
+      category: document.getElementById('menu-cat').value,
+      name: document.getElementById('menu-name').value,
+      desc: document.getElementById('menu-desc').value,
+      price: Number(document.getElementById('menu-price').value)
+    };
+    const res = await callApi(payload);
+    if(res.ok) { closeMenuModal(); loadAdminMenu(); }
+  }
+
+  async function deleteMenuItem(id) {
+    if(!confirm("確定刪除此品項？")) return;
+    const res = await callApi({ action: "deleteMenuItem", id: id });
+    if(res.ok) loadAdminMenu();
+  }
+
+  window.onload = loadPendingOrders;
 </script>
+
 </body>
 </html>
