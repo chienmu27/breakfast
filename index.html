@@ -12,7 +12,6 @@
     .category-btn.active { background-color: #ef4444; color: white; }
     .no-scrollbar::-webkit-scrollbar { display: none; }
     
-    /* 跑馬燈樣式：無色透明背景與置中動畫 */
     .marquee-wrapper {
       width: 100%;
       overflow: hidden;
@@ -53,7 +52,6 @@
         <span id="cart-count" class="absolute -top-2 -right-2 bg-yellow-400 text-red-800 text-xs font-bold px-1.5 py-0.5 rounded-full">0</span>
       </div>
     </div>
-    
     <div class="w-10"></div>
   </div>
 </header>
@@ -88,7 +86,6 @@
 <div id="overlay" onclick="toggleCart()" class="fixed inset-0 bg-black bg-opacity-50 hidden z-50"></div>
 
 <script>
-  // GAS API URL
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec";
 
   let menuData = [];
@@ -143,20 +140,19 @@
     });
   }
 
-  // 4. 修正後的菜單渲染邏輯
+  // 修改：在 HTML 中傳入 this 以便定位元素
   function displayMenu(f) {
     const container = document.getElementById('menu-container');
-    container.innerHTML = ''; // 清空容器
+    container.innerHTML = '';
     const items = f === 'all' ? menuData : menuData.filter(i => i.category === f);
     
-    // 使用 DocumentFragment 或一次性字串拼接優化效能並確保 ID 獨立
-    let htmlContent = '';
     items.forEach(i => {
       const cartItem = cart.find(c => c.id === i.id);
       const qty = cartItem ? cartItem.qty : 0;
       
-      htmlContent += `
-        <div class="bg-white rounded-xl shadow-sm border p-4 flex justify-between items-center">
+      const card = document.createElement('div');
+      card.className = "bg-white rounded-xl shadow-sm border p-4 flex justify-between items-center";
+      card.innerHTML = `
           <div class="flex-grow">
             <span class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded">${i.category}</span>
             <h3 class="font-bold mt-1 text-lg">${i.name}</h3>
@@ -164,16 +160,16 @@
             <p class="text-red-600 font-bold mt-2 text-lg">$${i.price}</p>
           </div>
           <div class="flex items-center gap-3 bg-gray-100 p-1.5 rounded-full border border-gray-200">
-            <button onclick="removeFromCart(${i.id})" class="bg-white text-gray-700 w-8 h-8 rounded-full shadow-sm flex items-center justify-center hover:bg-gray-200 active:scale-90 transition">-</button>
-            <span class="font-bold min-w-[20px] text-center text-lg" id="qty-${i.id}">${qty}</span>
-            <button onclick="addToCart(${i.id})" class="bg-red-600 text-white w-8 h-8 rounded-full shadow-sm flex items-center justify-center hover:bg-red-700 active:scale-90 transition">+</button>
-          </div>
-        </div>`;
+            <button onclick="removeFromCart(this, ${i.id})" class="bg-white text-gray-700 w-8 h-8 rounded-full shadow-sm flex items-center justify-center hover:bg-gray-200 active:scale-90 transition">-</button>
+            <span class="qty-display font-bold min-w-[20px] text-center text-lg">${qty}</span>
+            <button onclick="addToCart(this, ${i.id})" class="bg-red-600 text-white w-8 h-8 rounded-full shadow-sm flex items-center justify-center hover:bg-red-700 active:scale-90 transition">+</button>
+          </div>`;
+      container.appendChild(card);
     });
-    container.innerHTML = htmlContent;
   }
 
-  function addToCart(id) {
+  // 修改：接收 btn 參數，利用 DOM 導向更新同一個卡片內的數量標籤
+  function addToCart(btn, id) {
     const i = menuData.find(m => m.id === id);
     let exist = cart.find(c => c.id === id);
     if (exist) {
@@ -183,12 +179,13 @@
       cart.push(exist);
     }
     updateUI();
-    // 確保只更新對應的 ID 顯示
-    const qtyLabel = document.getElementById(`qty-${id}`);
-    if (qtyLabel) qtyLabel.innerText = exist.qty;
+    
+    // 定位到按鈕旁邊的數量標籤
+    const qtySpan = btn.parentElement.querySelector('.qty-display');
+    if (qtySpan) qtySpan.innerText = exist.qty;
   }
 
-  function removeFromCart(id) {
+  function removeFromCart(btn, id) {
     const idx = cart.findIndex(c => c.id === id);
     if (idx > -1) {
       cart[idx].qty--;
@@ -197,9 +194,9 @@
         cart.splice(idx, 1);
       }
       updateUI();
-      // 確保只更新對應的 ID 顯示
-      const qtyLabel = document.getElementById(`qty-${id}`);
-      if (qtyLabel) qtyLabel.innerText = finalQty > 0 ? finalQty : 0;
+      
+      const qtySpan = btn.parentElement.querySelector('.qty-display');
+      if (qtySpan) qtySpan.innerText = finalQty > 0 ? finalQty : 0;
     }
   }
 
@@ -247,7 +244,6 @@
 
   function filterMenu(c) {
     document.querySelectorAll('.category-btn').forEach(b => {
-      // 修正：依據按鈕內容文字或全部標籤來切換 active
       b.classList.toggle('active', b.innerText === c || (c==='all' && b.innerText==='全部'));
     });
     displayMenu(c);
