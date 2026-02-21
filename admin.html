@@ -224,29 +224,43 @@
     tbody.innerHTML = '<tr><td colspan="6" class="p-10 text-center">讀取中...</td></tr>';
     const res = await api({ action: "getOrderHistory" });
     if(res.ok) {
-      // 這裡計算試算表行數，考慮到後端使用了 .reverse()
-      // 原本資料是 [Row2, Row3, Row4]，reverse 後變成 [Row4, Row3, Row2]
       const total = res.data.length;
-      tbody.innerHTML = res.data.map((r, i) => `
+      tbody.innerHTML = res.data.map((r, i) => {
+        let statusText = "";
+        let statusClass = "";
+        
+        // 根據狀態設定文字與顏色
+        if (r.status === 'completed') {
+          statusText = "已結單";
+          statusClass = "text-gray-400";
+        } else if (r.status === 'served') {
+          statusText = "已送餐";
+          statusClass = "text-blue-600 font-bold";
+        } else {
+          statusText = "準備中";
+          statusClass = "text-green-600 font-bold";
+        }
+
+        return `
         <tr class="border-b hover:bg-gray-50">
           <td class="px-4 py-4 text-xs">${new Date(r.time).toLocaleString()}</td>
           <td class="px-4 py-4 font-bold">${r.table}</td>
           <td class="px-4 py-4">${r.name} x ${r.qty}</td>
           <td class="px-4 py-4 font-bold text-red-600">$${r.subtotal}</td>
-          <td class="px-4 py-4"><span class="${r.status === 'completed' ? 'text-gray-400' : 'text-green-600 font-bold'}">${r.status === 'completed' ? '已結單' : '準備中'}</span></td>
+          <td class="px-4 py-4"><span class="${statusClass}">${statusText}</span></td>
           <td class="px-4 py-4">
             <button onclick="reqAuth('deleteOrder', ${total - i + 1})" class="text-gray-300 hover:text-red-600"><i class="fas fa-trash-alt"></i></button>
           </td>
-        </tr>`).join('');
+        </tr>`;
+      }).join('');
     }
   }
 
-  // 3. 菜單管理 (直接抓取修正)
+  // 3. 菜單管理
   async function loadAdminMenu() {
     const tbody = document.getElementById('admin-menu-tbody');
     tbody.innerHTML = '<tr><td colspan="5" class="p-10 text-center">菜單載入中...</td></tr>';
     
-    // 使用 GET 獲取菜單數據 (避免 POST 權限問題)
     try {
       const resp = await fetch(`${GAS_API_URL}?action=getMenu`);
       const res = await resp.json();
@@ -311,7 +325,7 @@
       if (type === 'deleteAll') payload.action = "deleteAllOrders";
       else if (type === 'deleteMenu') { payload.action = "deleteMenuItem"; payload.row = row; }
       else if (type === 'deleteOrder') { 
-        payload.action = "deleteMenuItem"; // 借用刪除邏輯
+        payload.action = "deleteMenuItem";
         payload.row = row; 
         payload.targetSheet = "order"; 
       }
