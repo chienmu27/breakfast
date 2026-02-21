@@ -5,39 +5,55 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>阿胖早點｜後台管理系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap');
+    body { font-family: 'Noto Sans TC', sans-serif; }
+  </style>
 </head>
 
 <body class="bg-gray-50 min-h-screen">
 
 <script>
-  // 請確保此網址正確
+  // GAS API 網址 (請確保已部署為「所有人」)
   const GAS_API_URL = "https://script.google.com/macros/s/AKfycby7pD3O3PgpIfwjjUHkY8L-Oyr5IadRA7YZ1NEDOZf35rejAfALmI8EoMuxyc8ush2gDw/exec";
 </script>
 
 <div id="login-view" class="min-h-screen flex items-center justify-center p-4">
-  <div class="bg-white w-full max-w-md rounded-2xl shadow p-6 border">
-    <div class="text-2xl font-black text-red-600 mb-2">阿胖早點｜後台</div>
-    <div class="text-gray-600 mb-6">請輸入密碼登入</div>
-    <input id="pwd" type="password" class="w-full border rounded-xl px-4 py-3 focus:outline-none focus:ring" placeholder="輸入後台密碼" />
-    <button onclick="login()" class="w-full mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-3 rounded-xl">登入</button>
-    <div id="login-msg" class="text-center text-red-600 mt-4 font-bold"></div>
+  <div class="bg-white w-full max-w-md rounded-2xl shadow-xl p-8 border border-gray-100">
+    <div class="text-3xl font-black text-red-600 mb-2">阿胖早點</div>
+    <div class="text-gray-500 mb-8 font-bold">管理後台登入</div>
+    
+    <label class="block text-gray-700 text-sm font-bold mb-2">管理員密碼 (設定工作表 A2)</label>
+    <input id="pwd" type="password" 
+           class="w-full border-2 border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-red-500 transition-all font-mono" 
+           placeholder="請輸入後台密碼" />
+    
+    <button onclick="login()" 
+            class="w-full mt-6 bg-red-600 hover:bg-red-700 text-white font-black py-4 rounded-xl shadow-lg transition-transform active:scale-95">
+      登入管理系統
+    </button>
+    <div id="login-msg" class="text-center text-red-500 mt-4 font-bold min-h-[1.5rem]"></div>
   </div>
 </div>
 
 <div id="admin-view" class="hidden">
-  <header class="bg-red-600 text-white p-4 shadow sticky top-0 z-50">
+  <header class="bg-red-600 text-white p-4 shadow-md sticky top-0 z-50">
     <div class="max-w-6xl mx-auto flex items-center justify-between">
-      <h1 class="text-xl font-bold">阿胖早點｜訂單管理</h1>
+      <div class="flex items-center gap-2">
+        <h1 class="text-xl font-black tracking-tight">阿胖早點｜訂單管理</h1>
+      </div>
       <div class="flex gap-2">
-        <button onclick="loadData()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-bold">重新整理</button>
-        <button onclick="logout()" class="bg-black/20 hover:bg-black/30 px-4 py-2 rounded-lg font-bold">登出</button>
+        <button onclick="loadData()" class="bg-white/20 hover:bg-white/30 px-4 py-2 rounded-lg font-bold text-sm">重新整理</button>
+        <button onclick="logout()" class="bg-black/20 hover:bg-black/30 px-4 py-2 rounded-lg font-bold text-sm">登出</button>
       </div>
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto p-4">
-    <div id="status" class="text-gray-600 mb-4"></div>
-    <div id="tables" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+  <main class="max-w-6xl mx-auto p-4 md:p-6">
+    <div id="status" class="text-gray-500 font-bold mb-6 flex items-center gap-2">
+      </div>
+    
+    <div id="tables" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
   </main>
 </div>
 
@@ -45,10 +61,10 @@
   let LOGGED_IN = false;
   let SESSION_TOKEN = "";
   let lastPendingCount = 0;
-  // 用來記錄每一桌按鈕目前的顯示狀態：'served' (待送餐) 或 'completed' (待結帳)
+  // 記錄每一桌的 UI 按鈕狀態
   let tableButtonState = {}; 
 
-  function money(n){ return "$" + Number(n||0); }
+  function money(n){ return "$" + Number(n||0).toLocaleString(); }
 
   function fmtTime(v){
     if(!v) return "";
@@ -56,10 +72,11 @@
       const d = new Date(v);
       if(isNaN(d.getTime())) return "";
       const pad = x => String(x).padStart(2,"0");
-      return `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
     }catch(e){ return ""; }
   }
 
+  // 共用 API 呼叫
   async function api(payload){
     if(LOGGED_IN && SESSION_TOKEN) payload.token = SESSION_TOKEN;
     const res = await fetch(GAS_API_URL, {
@@ -74,19 +91,26 @@
   async function login(){
     const pwd = document.getElementById("pwd").value.trim();
     if(!pwd) return;
+    const msg = document.getElementById("login-msg");
+    msg.innerText = "驗證中...";
+    
     try{
+      // 傳送密碼至後端 adminLogin，後端會從「設定」工作表 A2 抓取密碼比對
       const data = await api({ action:"adminLogin", password: pwd });
       if(data && data.ok){
         LOGGED_IN = true;
-        SESSION_TOKEN = pwd;
+        SESSION_TOKEN = data.token; // 後端傳回的 token (通常是 A2 的值)
         document.getElementById("login-view").classList.add("hidden");
         document.getElementById("admin-view").classList.remove("hidden");
         loadData();
-        setInterval(checkNewOrders, 5000);
+        // 每 10 秒檢查一次新訂單
+        setInterval(checkNewOrders, 10000);
       }else{
-        document.getElementById("login-msg").innerText = "密碼錯誤";
+        msg.innerText = "密碼錯誤，請確認試算表設定";
       }
-    }catch(err){ alert("登入失敗"); }
+    }catch(err){ 
+      msg.innerText = "連線失敗，請檢查 GAS 部署"; 
+    }
   }
 
   function logout(){
@@ -95,16 +119,20 @@
 
   async function loadData(){
     if(!LOGGED_IN) return;
-    document.getElementById("status").innerText = "載入中...";
+    const statusEl = document.getElementById("status");
+    statusEl.innerHTML = `<span class="inline-block animate-spin">⏳</span> 載入數據中...`;
+    
     try{
       const data = await api({ action:"getPendingOrdersMerged" });
       if(data && data.ok){
         const list = data.data || [];
         lastPendingCount = list.length;
-        document.getElementById("status").innerText = list.length === 0 ? "目前沒有訂單 ✅" : `目前有 ${list.length} 桌訂單`;
+        statusEl.innerText = list.length === 0 ? "目前沒有待處理訂單 ✅" : `目前有 ${list.length} 桌訂單待處理`;
         renderTables(list);
       }
-    }catch(err){ console.error(err); }
+    }catch(err){ 
+      statusEl.innerText = "無法載入訂單資料";
+    }
   }
 
   function renderTables(data){
@@ -112,37 +140,45 @@
     root.innerHTML = "";
 
     data.forEach(t=>{
-      // 如果後端狀態是 served，前端按鈕就預設顯示「結帳」
-      if (!tableButtonState[t.table]) {
-        tableButtonState[t.table] = (t.status === "served") ? "completed" : "served";
+      // 如果後端傳來的狀態已經是 served，強制按鈕狀態為 completed (結帳)
+      if (t.status === "served") {
+        tableButtonState[t.table] = "completed";
+      } else if (!tableButtonState[t.table]) {
+        // 若無紀錄則預設為待送餐
+        tableButtonState[t.table] = "served";
       }
 
       const itemsHtml = (t.items||[]).map(x=>`
-        <div class="flex justify-between border-b py-2 text-sm">
-          <div><span class="font-bold">${x.item}</span> <span class="text-gray-400">x${x.qty}</span></div>
-          <div class="font-bold text-red-600">${money(x.subtotal)}</div>
+        <div class="flex justify-between border-b border-gray-100 py-3 text-sm">
+          <div>
+            <span class="font-bold text-gray-800">${x.item}</span> 
+            <span class="text-red-500 font-bold ml-1">x${x.qty}</span>
+          </div>
+          <div class="font-bold text-gray-400">${money(x.subtotal)}</div>
         </div>
       `).join("");
 
       const isWaitingCheckout = tableButtonState[t.table] === "completed";
 
       const el = document.createElement("div");
-      el.className = `rounded-2xl shadow-sm border p-4 transition-colors ${isWaitingCheckout ? 'bg-orange-50 border-orange-200' : 'bg-white border-gray-200'}`;
+      el.className = `rounded-3xl shadow-lg border-2 p-5 transition-all duration-300 ${isWaitingCheckout ? 'bg-orange-50 border-orange-400' : 'bg-white border-white'}`;
 
       el.innerHTML = `
-        <div class="flex items-center justify-between mb-2">
-          <div class="text-xl font-black">桌號 ${t.table}</div>
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <div class="text-2xl font-black text-gray-800">桌號 ${t.table}</div>
+            <div class="text-[10px] text-gray-400 uppercase tracking-widest mt-1">下單 ${fmtTime(t.time)}</div>
+          </div>
           <button id="btn-${t.table}" 
             onclick="handleTableAction('${t.table}')"
-            class="font-bold px-6 py-2 rounded-xl transition-all ${isWaitingCheckout ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}">
-            ${isWaitingCheckout ? '結帳' : '送餐'}
+            class="font-black px-6 py-3 rounded-2xl shadow-md transition-all active:scale-90 ${isWaitingCheckout ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-green-600 hover:bg-green-700 text-white'}">
+            ${isWaitingCheckout ? '💰 結帳' : '🚚 送餐'}
           </button>
         </div>
-        <div class="text-xs text-gray-400 mb-3">下單時間：${fmtTime(t.time)}</div>
-        <div class="space-y-1">${itemsHtml}</div>
-        <div class="flex justify-between mt-4 pt-3 border-t">
-          <div class="font-bold text-gray-700">總計</div>
-          <div class="font-black text-xl text-red-600">${money(t.total)}</div>
+        <div class="space-y-1 bg-white/50 rounded-2xl p-2">${itemsHtml}</div>
+        <div class="flex justify-between items-center mt-4 px-2">
+          <div class="font-bold text-gray-500 uppercase text-xs tracking-wider">Total</div>
+          <div class="font-black text-2xl text-red-600">${money(t.total)}</div>
         </div>
       `;
       root.appendChild(el);
@@ -150,30 +186,31 @@
   }
 
   async function handleTableAction(tableNo) {
-    const currentState = tableButtonState[tableNo]; // 'served' 或 'completed'
+    const currentState = tableButtonState[tableNo]; 
     
     if (currentState === "served") {
-      // 點擊「送餐」
+      // 送餐動作
       try {
         const res = await api({ action: "markTableStatus", table: tableNo, status: "served" });
         if (res.ok) {
-          tableButtonState[tableNo] = "completed"; // 狀態轉為待結帳
-          loadData(); // 重新渲染
+          tableButtonState[tableNo] = "completed"; 
+          loadData(); 
         }
-      } catch (err) { alert("操作失敗"); }
+      } catch (err) { alert("操作失敗，請重新整理"); }
     } else {
-      // 點擊「結帳」
-      if (!confirm(`桌號 ${tableNo} 確定結帳並清除訂單？`)) return;
+      // 結帳動作
+      if (!confirm(`桌號 ${tableNo} 確認已完成結帳並清除訂單？`)) return;
       try {
         const res = await api({ action: "markTableStatus", table: tableNo, status: "completed" });
         if (res.ok) {
-          delete tableButtonState[tableNo]; // 清除狀態追蹤
-          loadData(); // 重新載入，該桌會消失
+          delete tableButtonState[tableNo]; 
+          loadData(); 
         }
       } catch (err) { alert("操作失敗"); }
     }
   }
 
+  // 自動檢查有無訂單增減
   async function checkNewOrders(){
     if(!LOGGED_IN) return;
     try{
